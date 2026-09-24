@@ -1,0 +1,17 @@
+apiVersion: forge.dev/v1alpha1
+kind: Platform
+metadata: { name: k8s-smoke-bench }
+spec:
+  storage: { uri: /work/.forge-bench }
+---
+apiVersion: forge.dev/v1alpha1
+kind: Model
+metadata: { name: qwen-05b }
+spec:
+  base: qwen2.5-0.5b-instruct
+  licence: Apache-2.0
+  eval:
+    evaluators:
+      - command: { run: "python3 bench.py --base-url {base_url} --model {model} --out {output}" }
+        name: toy-bench
+    gate: { test: non-inferiority, margin: -0.05, minItems: 2 }

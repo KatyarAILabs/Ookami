@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: forge-smoke
+  namespace: forge-test
+  labels: { app: forge-smoke }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: forge
+      image: ghcr.io/ggml-org/llama.cpp:full
+      command: ["/bin/bash", "/config/smoke.sh"]
+      env:
+        - { name: LLAMA_CACHE, value: /work/models }
+        - { name: LD_LIBRARY_PATH, value: /app }   # llama.cpp images keep their shared libraries next to the binaries
+      resources:
+        requests: { cpu: "1500m", memory: 3Gi }
+        limits: { memory: 6Gi }
+      volumeMounts:
+        - { name: config, mountPath: /config }
+        - { name: wheel, mountPath: /wheel }
+        - { name: work, mountPath: /work }
+  volumes:
+    - { name: config, configMap: { name: forge-smoke-config } }
+    - { name: wheel, configMap: { name: forge-wheel } }
+    - { name: work, emptyDir: {} }
