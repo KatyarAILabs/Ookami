@@ -21,6 +21,8 @@ const STATUS = {
   training: "warn", evaluating: "warn", running: "warn", queued: "warn", starting: "warn", partial: "warn",
   failed: "bad", rejected: "bad", exited: "bad", fail: "bad", revoked: "", retired: "", cancelled: "",
 };
+// Why a playground reply ended, from the OpenAI finish_reason.
+const STOP = { stop: "finished", length: "stopped: hit max tokens", tool_calls: "stopped: tool call", content_filter: "stopped: content filter" };
 const badge = (s) => `<span class="badge ${STATUS[s] ?? ""}">${h(s || "—")}</span>`;
 
 // ------------------------------------------------------------------ API and session
@@ -67,8 +69,8 @@ async function signIn(key) {
   sessionStorage.setItem("ookami.key", token);
   $("#signin").classList.add("hidden");
   $("#app").classList.remove("hidden");
-  $("#platform-name").textContent = `${ov.platform} · ${ov.backend}`;
-  $("#gateway-pill").textContent = ov.gateway.url ? `gateway ${ov.gateway.url} · auth ${ov.gateway.auth}` : "no gateway";
+  $("#platform-name").textContent = ov.platform;
+  $("#gateway-pill").textContent = ov.gateway.url ? `${ov.gateway.url} · auth ${ov.gateway.auth}` : "no gateway";
   route();
 }
 
@@ -107,9 +109,10 @@ async function overview(el) {
       <div class="card card-flush"><h2>Services</h2>${table(["Service", "Kind", "State", "Endpoint"],
         ov.services.map((x) => [h(x.name), h(x.kind), badge(x.state), `<span class="mono">${h(x.url)}</span>`]),
         "Nothing running. Start with <code>ookami up</code>.")}</div>
-      <div class="card card-flush"><h2>Models</h2>${table(["Model", "Kind", "Serves", "Live version"],
-        ov.models.map((m) => [`<a href="#/models/${encodeURIComponent(m.name)}">${h(m.name)}</a>`, h(m.kind),
-          `<span class="mono">${h(m.provider || m.base)}</span>`, m.live ? badge("promoted") + " " + h(m.live) : `<span class="muted">base model</span>`]),
+      <div class="card card-flush"><h2>Models</h2>${table(["Model", "Serves", "Live"],
+        ov.models.map((m) => [`<a href="#/models/${encodeURIComponent(m.name)}">${h(m.name)}</a>`,
+          `<span class="mono">${h(m.provider || m.base)}</span>`,
+          m.kind === "api" ? `<span class="muted">API</span>` : m.live ? `<span class="badge accent">${h(m.live)}</span>` : `<span class="muted">base model</span>`]),
         "No models in ookami.yaml.")}</div>
     </div>
     ${ov.issues.length ? `<div class="card"><h2>Config notes</h2><ul>${ov.issues.map((i) => `<li class="small">${h(i)}</li>`).join("")}</ul></div>` : ""}`;
@@ -298,8 +301,8 @@ async function playground(el) {
       </div>
     </div>`;
   const draw = () => {
-    $("#chat").innerHTML = history.length ? history.map((m) => `<div class="msg ${m.role}">${h(m.content)}${m.meta ? `<span class="meta">${h(m.meta)}</span>` : ""}</div>`).join("")
-      : `<div class="muted">Pick a model and send a message.</div>`;
+    $("#chat").innerHTML = history.length ? history.map((m) => `<div class="msg ${m.role}">${h(m.content)}${m.meta ? `<span class="meta">${h(m.meta)}${m.stop ? ` · <span class="${m.cut ? "stop-cut" : ""}">${h(m.stop)}</span>` : ""}</span>` : ""}</div>`).join("")
+      : `<div class="empty">Pick a model and send a message.</div>`;
     $("#chat").scrollTop = $("#chat").scrollHeight;
   };
   draw();
@@ -315,7 +318,9 @@ async function playground(el) {
     try {
       const r = await api("chat", { body: { model: $("#pg-model").value, messages, temperature: $("#pg-temp").value, max_tokens: $("#pg-max").value } });
       const tokens = r.usage ? `${r.usage.prompt_tokens} in · ${r.usage.completion_tokens} out · ` : "";
-      history.push({ role: "assistant", content: r.message.content || JSON.stringify(r.message.tool_calls || ""), meta: `${$("#pg-model").value} · ${tokens}${r.latency_ms} ms` });
+      const why = STOP[r.finish_reason] || (r.finish_reason ? `stopped: ${r.finish_reason}` : "");
+      history.push({ role: "assistant", content: r.message.content || JSON.stringify(r.message.tool_calls || ""),
+        meta: `${$("#pg-model").value} · ${tokens}${r.latency_ms} ms`, stop: why, cut: r.finish_reason === "length" });
     } catch (err) {
       history.push({ role: "assistant", content: "Error: " + err.message });
     }
@@ -335,7 +340,7 @@ function detail(raw) {
 }
 
 function stat(label, value, sub) {
-  return `<div class="card stat"><div class="label">${h(label)}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+  return `<div class="stat"><div class="label">${h(label)}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
 }
 const num = (v) => ({ num: true, html: v });
 function table(head, rows, empty) {

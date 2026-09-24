@@ -236,8 +236,9 @@ class Console:
             raise ApiError(e.code, e.read().decode(errors="replace")[:500]) from None
         except (urllib.error.URLError, OSError) as e:
             raise ApiError(502, f"gateway unreachable ({e}); is `ookami up` running?") from None
-        return {"message": data["choices"][0]["message"], "usage": data.get("usage"),
-                "latency_ms": round((time.time() - started) * 1000)}
+        choice = data["choices"][0]
+        return {"message": choice["message"], "finish_reason": choice.get("finish_reason"), "usage": data.get("usage"),
+                "latency_ms": round((time.time() - started) * 1000), "max_tokens": payload["max_tokens"]}
 
 
 def make_handler(console: Console) -> type[BaseHTTPRequestHandler]:

@@ -20,7 +20,7 @@ A web UI over everything Ookami runs: services, models and their versions, train
 | Training | Start a training job, watch jobs, follow a job's trainer log live |
 | Keys | Create keys (shown once), see API spend against budget, revoke |
 | Usage | Requests per day; spend per key or team, split into API cost and self-hosted hardware cost; cost per million tokens for each self-hosted model |
-| Playground | Chat with any model through the gateway. Calls use the master key server-side and show up in Usage |
+| Playground | Chat with any model through the gateway, and see why each reply ended (finished, hit max tokens, tool call). Calls use the master key server-side and show up in Usage |
 
 ![Models](images/console-models.png)
 
@@ -34,4 +34,4 @@ A web UI over everything Ookami runs: services, models and their versions, train
 | Every action goes through the same code as the CLI | Promotion still needs a passing gate or a recorded reason; keys are still stored only as hashes |
 | Binds to `127.0.0.1` by default | Put it behind your own proxy and SSO to share it (SSO is planned for 0.5) |
 | Strict Content-Security-Policy (`self` only), `X-Frame-Options: DENY`, no inline scripts; all server data escaped before rendering | Stops injected scripts running and the page being framed |
-| Light and dark, following the system setting | Readable in either |
+| Monochrome, 1px lines, square corners; colour only in status dots; follows the system light/dark setting | Calm and dense, so status stands out |

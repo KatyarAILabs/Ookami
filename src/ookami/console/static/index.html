@@ -10,19 +10,28 @@
 <body>
   <div id="signin" class="signin hidden">
     <form id="signin-form" class="signin-card">
-      <div class="brand brand-lg"><img src="favicon.svg" alt=""><span>Ookami</span></div>
-      <p class="muted">Sign in with the master key. Get it with <code>ookami keys master</code>.</p>
+      <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+      <h1>Sign in to the console</h1>
+      <p class="muted">Use the master key. Print it with <code>ookami keys master</code>.</p>
       <label for="signin-key">Master key</label>
       <input id="signin-key" type="password" autocomplete="off" spellcheck="false" placeholder="ook-master-…" required>
       <p id="signin-error" class="error hidden"></p>
-      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      <button type="submit" class="btn btn-primary btn-block">Continue</button>
     </form>
   </div>
 
   <div id="app" class="app hidden">
-    <aside class="sidebar">
-      <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
-      <nav id="nav">
+    <header class="header">
+      <div class="header-row">
+        <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+        <span class="slash">/</span>
+        <span id="platform-name" class="project"></span>
+        <div class="header-right">
+          <span id="gateway-pill" class="pill"></span>
+          <button id="signout" class="btn btn-sm">Sign out</button>
+        </div>
+      </div>
+      <nav id="nav" class="tabs">
         <a href="#/overview" data-page="overview">Overview</a>
         <a href="#/models" data-page="models">Models</a>
         <a href="#/training" data-page="training">Training</a>
@@ -30,16 +39,9 @@
         <a href="#/usage" data-page="usage">Usage</a>
         <a href="#/playground" data-page="playground">Playground</a>
       </nav>
-      <div class="sidebar-foot">
-        <div id="platform-name" class="muted small"></div>
-        <button id="signout" class="btn btn-ghost btn-sm">Sign out</button>
-      </div>
-    </aside>
+    </header>
     <main>
-      <header class="topbar">
-        <h1 id="page-title"></h1>
-        <div id="gateway-pill" class="pill"></div>
-      </header>
+      <div class="page-head"><h1 id="page-title"></h1></div>
       <section id="page" class="page"></section>
     </main>
   </div>
