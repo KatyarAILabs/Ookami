@@ -178,7 +178,7 @@ def secret_ref(ref: str | None) -> str | None:
 
 
 def gateway_config(engines: list[Service], tracing: bool = False, providers: list | None = None,
-                   master_key: str | None = None, usage: bool = False) -> dict:
+                   master_key: str | None = None, usage: bool = False, langfuse: bool = False) -> dict:
     """LiteLLM config: one route per Model; auth, usage and tracing hooks when asked for."""
     models = [{"model_name": s.name,
                "litellm_params": {"model": f"openai/{s.model_id}", "api_base": s.url, "api_key": "none"}}
@@ -196,12 +196,30 @@ def gateway_config(engines: list[Service], tracing: bool = False, providers: lis
         callbacks.append(f"{HOOKS}.usage_logger")
     if tracing:
         callbacks.append("generic_api")      # LiteLLM -> Trajectory webhook, one callback per completion
+    if langfuse:
+        callbacks.append("langfuse_otel")    # LiteLLM -> Langfuse over OpenTelemetry
     conf: dict = {"model_list": models, "litellm_settings": {"drop_params": True}}
     if callbacks:
         conf["litellm_settings"]["callbacks"] = callbacks
     if master_key:
         conf["general_settings"] = {"master_key": master_key, "custom_auth": f"{HOOKS}.user_api_key_auth"}
     return conf
+
+
+def langfuse_env(plat) -> dict[str, str]:
+    """Langfuse credentials for the gateway, resolved from the environment (${secret:NAME} = env NAME)."""
+    lf = plat.observability.langfuse
+    try:
+        import opentelemetry.exporter.otlp.proto.http  # noqa: F401
+    except ImportError:
+        raise UpError("observability.langfuse needs: pip install 'ookami[observability]'") from None
+    env = {"LANGFUSE_HOST": lf.host}
+    for var, ref in (("LANGFUSE_PUBLIC_KEY", lf.publicKey), ("LANGFUSE_SECRET_KEY", lf.secretKey)):
+        name = secret_ref(ref).removeprefix("os.environ/")
+        if not os.environ.get(name):
+            raise UpError(f"observability.langfuse: environment variable {name} is not set")
+        env[var] = os.environ[name]
+    return env
 
 
 def tracing_env(plat) -> dict[str, str]:
@@ -285,8 +303,9 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             conf = storage_dir(cfg) / "run" / "gateway.yaml"
             engines = [s for s in services if s.kind == "engine"]
             master = keystore.master_key() if gw.auth == "keys" else None
-            conf.write_text(yaml.safe_dump(gateway_config(engines, tracing, providers, master, usage=True),
-                                           sort_keys=False))
+            lf = plat.observability.langfuse is not None
+            conf.write_text(yaml.safe_dump(gateway_config(engines, tracing, providers, master, usage=True,
+                                                          langfuse=lf), sort_keys=False))
             os.chmod(conf, 0o600)            # holds the master key
             host = "127.0.0.1"
             if gw.command:
@@ -298,7 +317,8 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
                 argv = [exe, "--config", str(conf), "--host", host, "--port", str(gw.port)]
             if not port_free(gw.port):
                 raise UpError(f"gateway port {gw.port} is busy; set gateway.port")
-            env = {"OOKAMI_STORAGE": str(storage_dir(cfg)), **(tracing_env(plat) if tracing else {})}
+            env = {"OOKAMI_STORAGE": str(storage_dir(cfg)), **(tracing_env(plat) if tracing else {}),
+                   **(langfuse_env(plat) if lf else {})}
             svc = Service("gateway", "gateway", start(argv, logs / "gateway.log", env), gw.port,
                           f"http://{host}:{gw.port}/v1", f"http://{host}:{gw.port}/health/liveliness",
                           str(logs / "gateway.log"), argv)

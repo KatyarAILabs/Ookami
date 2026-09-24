@@ -14,6 +14,7 @@ dependencies = [
 gateway = ["litellm[proxy]>=1.83,<2"]   # 1.82.7 and 1.82.8 on PyPI were backdoored (Mar 2026)
 parquet = ["pyarrow>=15"]
 hf = ["datasets>=3"]
+observability = ["opentelemetry-sdk>=1.30", "opentelemetry-exporter-otlp-proto-http>=1.30"]
 train-cuda = ["trl>=0.20", "peft>=0.15", "transformers>=4.50", "datasets>=3", "bitsandbytes>=0.45", "torch"]
 
 [project.scripts]

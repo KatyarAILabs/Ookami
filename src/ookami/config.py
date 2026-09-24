@@ -118,6 +118,23 @@ class Tracing(Strict):
         return self
 
 
+class Langfuse(Strict):
+    """Send every gateway call to Langfuse (over OpenTelemetry) for a trace and eval UI."""
+    host: str = Field(description="your Langfuse URL, e.g. http://langfuse.internal:3000")
+    publicKey: str = Field(description="secret reference to the Langfuse public key")
+    secretKey: str = Field(description="secret reference to the Langfuse secret key")
+
+    @field_validator("publicKey", "secretKey")
+    @classmethod
+    def _secrets(cls, v: str) -> str:
+        return _secret(v)
+
+
+class Observability(Strict):
+    """Where the gateway sends traces for humans to browse. Trajectory (tracing) is for training data."""
+    langfuse: Langfuse | None = None
+
+
 class Component(Strict):
     """Turn a component on or off."""
     enabled: bool = Field(True, description="run this component")
@@ -163,6 +180,7 @@ class PlatformSpec(Strict):
     gateway: Gateway = Gateway()
     components: Components = Components()
     tracing: Tracing | None = None
+    observability: Observability = Observability()
     compute: Compute = Compute()
     telemetry: Literal["off", "on"] = Field("off", description="opt-in usage telemetry (none is sent today)")
 

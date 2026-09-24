@@ -16,6 +16,7 @@ A `ookami.yaml` holds YAML documents, each with `apiVersion: ookami.dev/v1alpha1
 | `gateway` | [Gateway](#gateway) | see below | The OpenAI-compatible gateway in front of every model. |
 | `components` | [Components](#components) | see below | Switch on what you need. Each component also works on its own. |
 | `tracing` | [Tracing](#tracing) (optional) | - | Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collector, its lake, and the gateway hook. |
+| `observability` | [Observability](#observability) | see below | Where the gateway sends traces for humans to browse. Trajectory (tracing) is for training data. |
 | `compute` | [Compute](#compute) | see below | What compute to use and where it comes from. |
 | `telemetry` | `off` \| `on` | `off` | opt-in usage telemetry (none is sent today) |
 
@@ -83,6 +84,24 @@ Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collec
 | `tokenEnv` | str (optional) | - | env var holding the bearer token the collector's webhook expects |
 | `healthUrl` | str | `http://127.0.0.1:9464/healthz` | collector liveness URL (its telemetry listener) |
 | `bin` | str | `cc` | the Trajectory CLI |
+
+### Observability
+
+Where the gateway sends traces for humans to browse. Trajectory (tracing) is for training data.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `langfuse` | [Langfuse](#langfuse) (optional) | - | Send every gateway call to Langfuse (over OpenTelemetry) for a trace and eval UI. |
+
+### Langfuse
+
+Send every gateway call to Langfuse (over OpenTelemetry) for a trace and eval UI.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `host` | str | **required** | your Langfuse URL, e.g. http://langfuse.internal:3000 |
+| `publicKey` | str | **required** | secret reference to the Langfuse public key |
+| `secretKey` | str | **required** | secret reference to the Langfuse secret key |
 
 ### Compute
 

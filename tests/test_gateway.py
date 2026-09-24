@@ -104,3 +104,31 @@ spec: { provider: { name: openai, model: gpt-5-mini, apiKey: "${secret:OPENAI_AP
     assert names["gpt"] == {"model": "openai/gpt-5-mini", "api_key": "os.environ/OPENAI_API_KEY"}
     assert conf["general_settings"]["custom_auth"].endswith("user_api_key_auth")
     assert conf["litellm_settings"]["callbacks"] == ["ookami.gateway.litellm_hooks.usage_logger"]
+
+
+def test_langfuse_wiring(write, monkeypatch):
+    from ookami.config import load
+    from ookami.local import runtime
+    cfg = load(write("f.yaml", """
+apiVersion: ookami.dev/v1alpha1
+kind: Platform
+metadata: { name: t }
+spec:
+  storage: { uri: ./s }
+  observability:
+    langfuse: { host: "http://lf:3000", publicKey: "${secret:LF_PK}", secretKey: "${secret:LF_SK}" }
+"""))
+    assert cfg.ok, cfg.issues
+    conf = runtime.gateway_config([], langfuse=True)
+    assert "langfuse_otel" in conf["litellm_settings"]["callbacks"]
+    monkeypatch.setenv("LF_PK", "pk-1")
+    monkeypatch.delenv("LF_SK", raising=False)
+    try:
+        import opentelemetry.exporter.otlp.proto.http  # noqa: F401
+    except ImportError:
+        pytest.skip("needs ookami[observability]")
+    with pytest.raises(runtime.UpError, match="LF_SK"):
+        runtime.langfuse_env(cfg.platform.spec)
+    monkeypatch.setenv("LF_SK", "sk-1")
+    assert runtime.langfuse_env(cfg.platform.spec) == {"LANGFUSE_HOST": "http://lf:3000", "LANGFUSE_PUBLIC_KEY": "pk-1",
+                                                       "LANGFUSE_SECRET_KEY": "sk-1"}
