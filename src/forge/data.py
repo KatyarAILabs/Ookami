@@ -12,31 +12,137 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .config import Splits
+from dataclasses import dataclass
+
+from .config import Config, DataSource, Splits
 from .evaluators.base import Example, Target, post_json
 
 
-def load_jsonl(path: Path) -> list[Example]:
+def to_example(row: dict, where: str) -> Example:
     """Rows: {id?, messages | input | prompt, label?, ...meta}. A trailing assistant message becomes the reference."""
-    out: list[Example] = []
-    for n, line in enumerate(path.read_text().splitlines(), 1):
-        if not line.strip():
+    row = dict(row)
+    raw_id = row.pop("id", None)
+    rid = str(raw_id) if raw_id not in (None, "") else \
+        hashlib.sha1(json.dumps(row, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    label = row.pop("label", None)
+    if row.get("messages") is not None:
+        msgs = list(row.pop("messages"))
+        if msgs and msgs[-1].get("role") == "assistant":
+            row["reference"] = msgs[-1]
+            msgs = msgs[:-1]
+        inp: Any = msgs
+    elif row.get("input") is not None or row.get("prompt") is not None:
+        inp = row.pop("input", None) or row.pop("prompt")
+    else:
+        raise ValueError(f"{where}: a row needs messages, input or prompt")
+    return Example(rid, inp, label, row)
+
+
+def load_jsonl(path: Path) -> list[Example]:
+    return [to_example(json.loads(line), f"{path}:{n}")
+            for n, line in enumerate(path.read_text().splitlines(), 1) if line.strip()]
+
+
+def load_source(src: DataSource, cfg: Config) -> tuple[list[Example], str]:
+    """Examples and a content hash for any data source."""
+    if src.jsonl:
+        path = cfg.resolve(src.jsonl)
+        return load_jsonl(path), dataset_hash(path)
+    if src.parquet:
+        try:
+            import pyarrow.parquet as pq
+        except ImportError:
+            raise ImportError("parquet sources need pyarrow: pip install 'forge-ml[parquet]'") from None
+        path = cfg.resolve(src.parquet)
+        rows = pq.read_table(path).to_pylist()
+        return [to_example(r, f"{path}:{i}") for i, r in enumerate(rows)], dataset_hash(path) if path.is_file() \
+            else _rows_hash(rows)
+    if src.hf:
+        try:
+            import datasets
+        except ImportError:
+            raise ImportError("Hugging Face sources need datasets: pip install 'forge-ml[hf]'") from None
+        name, _, split = src.hf.partition(":")
+        rows = list(datasets.load_dataset(name, split=split or "train"))
+        return [to_example(r, f"{src.hf}:{i}") for i, r in enumerate(rows)], _rows_hash(rows)
+    raise NotImplementedError("traces sources arrive with the tracing component (0.3)")
+
+
+def _rows_hash(rows: list[dict]) -> str:
+    h = hashlib.sha256()
+    for r in rows:
+        h.update(json.dumps(r, sort_keys=True, default=str).encode())
+    return h.hexdigest()[:16]
+
+
+def training_target(ex: Example) -> dict | None:
+    """The assistant turn to learn: the reference message, else the label as text."""
+    ref = ex.meta.get("reference")
+    if isinstance(ref, dict) and (ref.get("content") or ref.get("tool_calls")):
+        return {k: v for k, v in ref.items() if k in ("role", "content", "tool_calls")}
+    if ex.label is not None:
+        return {"role": "assistant", "content": str(ex.label)}
+    return None
+
+
+@dataclass
+class Snapshot:
+    dir: Path
+    hash: str
+    train: int
+    valid: int
+    held_out: int
+    audit: int
+    skipped: int
+
+
+def snapshot(cfg: Config, model: str) -> Snapshot:
+    """Write the training split of a Model's data as chat JSONL. Held-out and audit rows never enter it."""
+    spec = cfg.models[model].spec
+    if not spec.data:
+        raise ValueError(f"Model {model!r} has no data section")
+    examples, src_hash = load_source(spec.data.source, cfg)
+    splits = spec.eval.splits if spec.eval else Splits()
+    split_of = assign_splits(examples, splits)
+    train_rows, skipped = [], 0
+    for ex in examples:
+        if split_of[ex.id] != "train":
             continue
-        row = json.loads(line)
-        rid = str(row.pop("id", None) or hashlib.sha1(line.encode()).hexdigest()[:16])
-        label = row.pop("label", None)
-        if "messages" in row:
-            msgs = row.pop("messages")
-            if msgs and msgs[-1].get("role") == "assistant":
-                row["reference"] = msgs[-1]
-                msgs = msgs[:-1]
-            inp: Any = msgs
-        elif "input" in row or "prompt" in row:
-            inp = row.pop("input", None) or row.pop("prompt")
-        else:
-            raise ValueError(f"{path}:{n}: a row needs messages, input or prompt")
-        out.append(Example(rid, inp, label, row))
-    return out
+        target = training_target(ex)
+        if target is None:
+            skipped += 1
+            continue
+        msgs = ex.input if isinstance(ex.input, list) else [{"role": "user", "content": str(ex.input)}]
+        row: dict[str, Any] = {"messages": [*msgs, target]}
+        if ex.meta.get("tools"):
+            row["tools"] = ex.meta["tools"]
+        train_rows.append(row)
+    if len(train_rows) < spec.data.minExamples:
+        raise ValueError(f"Model {model!r} is not ready: {len(train_rows)} training rows, "
+                         f"data.minExamples is {spec.data.minExamples}")
+    # a small validation slice from the training split, for loss curves only
+    n_valid = max(1, min(200, len(train_rows) // 20))
+    digest = hashlib.sha256(f"{src_hash}:{splits.seed}:{splits.heldOut}:{splits.audit}".encode()).hexdigest()[:16]
+    out = cfg.resolve(_storage(cfg)) / "datasets" / model / digest
+    out.mkdir(parents=True, exist_ok=True)
+    valid, train = train_rows[:n_valid], train_rows[n_valid:]
+    (out / "train.jsonl").write_text("\n".join(json.dumps(r) for r in train) + "\n")
+    (out / "valid.jsonl").write_text("\n".join(json.dumps(r) for r in valid) + "\n")
+    counts = {"train": len(train), "valid": len(valid),
+              "heldOut": sum(v == "heldOut" for v in split_of.values()),
+              "audit": sum(v == "audit" for v in split_of.values()), "skipped_no_target": skipped}
+    (out / "manifest.json").write_text(json.dumps({"source_hash": src_hash, "splits": splits.model_dump(),
+                                                   "counts": counts}, indent=2))
+    return Snapshot(out, digest, len(train), len(valid), counts["heldOut"], counts["audit"], skipped)
+
+
+def _storage(cfg: Config) -> str:
+    uri = cfg.platform.spec.storage.uri if cfg.platform else "./.forge"
+    if uri.startswith("file://"):
+        return uri[len("file://"):]
+    if "://" in uri:
+        raise ValueError(f"local training needs local storage, got {uri}")
+    return uri
 
 
 def group_key(ex: Example) -> str:

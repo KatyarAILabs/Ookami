@@ -28,7 +28,8 @@ from .catalog import ALLOWED_LICENCES, CATALOG
 BASE_MODELS: dict[str, str] = {k: v.licence for k, v in CATALOG.items()}
 
 # Recipe fields a Model may override; everything else comes from the recipe and the memory planner.
-OVERRIDABLE = {"lora.rank", "lora.alpha", "epochs", "learning_rate", "max_seq_len", "batch_size", "seed"}
+OVERRIDABLE = {"lora.rank", "lora.alpha", "lora.dropout", "lora.layers", "epochs", "iters", "learning_rate",
+               "max_seq_len", "batch_size", "grad_accumulation", "seed", "quantize"}
 
 EVALUATOR_KINDS = ("labels", "python", "webhook", "command", "plugin", "lm-eval", "inspect", "structural")
 
@@ -170,12 +171,17 @@ class Data(Strict):
 
 
 class Train(Strict):
+    engine: Literal["auto", "mlx", "trl", "command"] = Field(
+        "auto", description="auto: trl on NVIDIA GPUs, mlx on Apple silicon; command: your own trainer")
+    command: str | None = Field(None, description="engine command: template with {job} (path to job.json)")
     recipe: Literal["sft", "dpo", "grpo", "sft-then-grpo"] = "sft"
     reward: str | None = Field(None, description="python evaluator ref used as the RL reward, e.g. ./evals/reward.py:score")
     overrides: dict[str, Any] = {}
 
     @model_validator(mode="after")
     def _check(self) -> "Train":
+        if self.engine == "command" and not self.command:
+            raise ValueError("train.engine command needs train.command")
         if "grpo" in self.recipe and not self.reward:
             raise ValueError(f"recipe {self.recipe} needs train.reward")
         bad = set(self.overrides) - OVERRIDABLE

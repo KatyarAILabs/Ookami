@@ -79,13 +79,10 @@ def run_eval(cfg: Config, model: str, candidate: Target, incumbent: Target) -> R
 
     row_evs = [(s, e) for s, e in evaluators if not isinstance(e, RolloutEvaluator)]
     if row_evs:
-        src = spec.data.source if spec.data else None
-        if not src or not src.jsonl:
-            raise NotImplementedError("row evaluators currently read data.source.jsonl")
-        path = cfg.resolve(src.jsonl)
-        examples = data.load_jsonl(path)
+        if not spec.data:
+            raise ValueError(f"Model {model!r}: row evaluators need a data section")
+        examples, provenance["dataset_sha"] = data.load_source(spec.data.source, cfg)
         split_of = data.assign_splits(examples, ev_cfg.splits)
-        provenance["dataset_sha"] = data.dataset_hash(path)
         chosen = [x for x in examples if split_of[x.id] != "train"]
         if not chosen:
             raise ValueError("no held-out or audit rows; the dataset is too small for these split fractions")

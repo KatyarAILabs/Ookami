@@ -12,6 +12,9 @@ dependencies = [
 
 [project.optional-dependencies]
 gateway = ["litellm[proxy]>=1.80"]
+parquet = ["pyarrow>=15"]
+hf = ["datasets>=3"]
+train-cuda = ["trl>=0.20", "peft>=0.15", "transformers>=4.50", "datasets>=3", "bitsandbytes>=0.45", "torch"]
 
 [project.scripts]
 forge = "forge.cli:main"
