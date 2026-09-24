@@ -1,5 +1,7 @@
 # Ookami
 
+![Ookami: self-hosted AI infrastructure in one package](docs/images/banner.png)
+
 **Open-source, self-hosted AI infrastructure in one package.** Gateway, model serving, fine-tuning, eval gates, model registry, trace capture and GPU autoscaling ship as one install and are driven by one config file. You switch on only what you need. It runs on one GPU box, on any Kubernetes cluster, in your cloud account, or air-gapped.
 
 ```yaml
@@ -18,7 +20,7 @@ spec:
   base: gpt-oss-20b
 ```
 
-> **Status: 0.3, early.** What works today, on one machine:
+> **Status: 0.3, early.** Verified on Apple silicon (MLX) and NVIDIA (A10G: vLLM + TRL). What works today, on one machine:
 > - `ookami init` → `ookami up`: open models on vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, plus API models, behind one gateway with **auth on by default** (keys, budgets, rate limits);
 > - `ookami usage`: spend per key or team, API and self-hosted;
 > - `ookami train` → gate → `promote`: LoRA fine-tuning gated against the live version by your evaluators, including Inspect and lm-eval;

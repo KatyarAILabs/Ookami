@@ -17,6 +17,7 @@
 - **New evaluators:** Inspect and lm-evaluation-harness, run in isolated environments via uvx.
 - **Langfuse trace UI** over OpenTelemetry (`observability.langfuse`, `ookami[observability]`).
 - **Console:** web UI for services, models and versions (promote, force with reason, reports, history), training jobs with live logs, keys, usage and cost, and a playground. Standard library only, strict CSP, sign in with the master key.
+- **Verified on NVIDIA:** a full run on an A10G, covering vLLM serving, TRL training, the multi-LoRA gate, promote and gateway routing. Fixed the training step count and batch sizing that the run exposed.
 - **Security:** requires LiteLLM ≥1.83, since 1.82.7 and 1.82.8 on PyPI were backdoored.
 
 ## 0.2.0 (unreleased)

@@ -28,7 +28,7 @@ This page records what has been run, where, and what happened. It's updated when
 | 2026-09-25 | MacBook, real LiteLLM proxy, fake engine | Gateway auth: no key, bad key, master, rpm, budget, revoke; `ookami usage` | **Pass:** 401 / 401 / 200 / 200-200-429 / 429 `budget_exceeded` / 401 after revoke; usage recorded per key and team. `langfuse_otel` enabled with an unreachable host: calls still 200 |
 | 2026-09-25 | MacBook, MLX Qwen3-4B | `ookami init` → `up` → first authenticated call | **10 s** with cached weights |
 | 2026-09-25 | MacBook, MLX Qwen3-4B behind the authenticated gateway | `ookami eval` with Inspect (arithmetic, 20 samples) and lm-eval (GSM8K, 20 problems) | **Pass:** Inspect 20/20, GSM8K 65% (strict-match), identical on both sides as expected for the same model. Found and fixed: inspect-ai and LiteLLM need incompatible `openai` versions (harnesses now run through uvx), and Inspect rejects absolute task paths |
-| - | NVIDIA GPU (vLLM + TRL) | `deploy/aws-gpu` or `deploy/k8s-gpu` | **Not yet run.** The Azure subscription has 0 GPU quota; the AWS GPU quota request is pending |
+| 2026-09-25 | AWS g5.xlarge on-demand (NVIDIA A10G 24 GB, driver 595.91), `vllm/vllm-openai` container: torch 2.13 (CUDA 13), vLLM 0.30.0, TRL 1.13.0, PEFT 0.21.0 | `deploy/aws-gpu`: validate, vLLM serving behind the gateway, TRL LoRA training, gate with vLLM multi-LoRA, promote, serve the trained version, 4 calls through the authenticated gateway | **Pass after one fix** (below). Qwen2.5-1.5B-Instruct trained in 16-bit LoRA, batch 8, 183 steps, in under a minute. Gate: **100%** on held-out (n=93) and audit (n=40) vs **0%** for the base. Gateway: 4/4 routed correctly. Instance, security group and key pair deleted afterwards; about 40 minutes of GPU time |
 
 ## Issues found by running on real hardware
 
@@ -38,6 +38,8 @@ This page records what has been run, where, and what happened. It's updated when
 | The quickstart was undertrained | 300 iterations with 8-step gradient accumulation was under half an epoch. The gate correctly rejected v1 | The quickstart uses 2 epochs; the default learning rate is 2e-4 |
 | A system LiteLLM without its proxy extras | The gateway crashed at start (`No module named 'fastapi'`) | Ship the `ookami[gateway]` extra and prefer the LiteLLM installed next to Ookami |
 | TRL assumed bf16 | Would fail on T4 and older GPUs | bf16 only where `torch.cuda.is_bf16_supported()`; fp16 otherwise |
+| TRL trained ~8× too many steps | The plan counted micro-batches but TRL's `max_steps` counts optimizer steps: a 2-epoch job was heading for ~16 epochs (1,458 steps, ~78 min) | `iters` always counts micro-batches; TRL converts with the accumulation factor |
+| An uncatalogued model got the most cautious plan | Qwen2.5-1.5B fell back to 4-bit QLoRA at batch 1: 22% GPU use, 2 GB of 23 GB | Read the parameter count from the model name; spend spare memory on bigger micro-batches (8×1 here). About 12× faster |
 | Rows flagged `error` were dropped before being counted | Found by the tests | Count errors before skipping rows without a score |
 
 ## Safeguards added because of these issues
@@ -48,7 +50,6 @@ This page records what has been run, where, and what happened. It's updated when
 
 | Limitation | Status |
 |---|---|
-| The vLLM LoRA serving path and the TRL trainer haven't run on a GPU | GPU test kits ready (`deploy/aws-gpu`, `deploy/k8s-gpu`) |
 | Promotion restarts the engine; no runtime adapter loading | Planned for 0.3 (vLLM) |
 | Nothing coordinates GPU use between serving and training on one machine | Planned with the queue's resource budget |
 | `ookami up` checks health only at start; no restart on crash | Planned |
