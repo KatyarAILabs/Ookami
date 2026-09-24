@@ -54,21 +54,46 @@ def resolve_weights(doc: ModelDoc, engine: str) -> str:
     return weights
 
 
-def launch(doc: ModelDoc, port: int) -> EngineLaunch:
+def engine_for(doc: ModelDoc) -> str:
+    s = doc.spec.serve.engine
+    return detect_engine() if s == "auto" else s
+
+
+def launch(doc: ModelDoc, port: int, adapter: str | None = None,
+           loras: dict[str, str] | None = None) -> EngineLaunch:
+    """The command that serves a Model's base, with a trained adapter when one is given.
+
+    The id clients send stays the Model name (vllm, command) or the weights id (mlx), with or without an
+    adapter, so the gateway config doesn't change when a new version goes live.
+    `loras` (vllm only) serves several named adapters from one process; used by the gate.
+    """
     s = doc.spec.serve
     name = doc.metadata.name
-    engine = detect_engine() if s.engine == "auto" else s.engine
+    engine = engine_for(doc)
     if engine == "command":
         weights = doc.spec.weights or resolve_weights(doc, "vllm")
-        argv = shlex.split(s.command.format(weights=weights, port=port, host=s.host, name=name)) + s.args
+        if adapter and "{adapter}" not in s.command:
+            raise EngineError(f"Model/{name}: serve.command has no {{adapter}} placeholder, "
+                              "so it can't serve a trained version")
+        argv = shlex.split(s.command.format(weights=weights, port=port, host=s.host, name=name,
+                                            adapter=adapter or "")) + s.args
         return EngineLaunch(engine, weights, s.modelId or name, argv)
     weights = resolve_weights(doc, engine)
     if engine == "vllm":
-        argv = [_bin("vllm", "vllm"), "serve", weights, "--host", s.host, "--port", str(port),
-                "--served-model-name", name, *s.args]
-        return EngineLaunch(engine, weights, name, argv)
-    argv = [_bin("mlx_lm.server", "mlx"), "--model", weights, "--host", s.host, "--port", str(port), *s.args]
-    return EngineLaunch(engine, weights, weights, argv)
+        argv = [_bin("vllm", "vllm"), "serve", weights, "--host", s.host, "--port", str(port)]
+        mods = dict(loras or {})
+        if adapter:
+            mods[name] = adapter
+        if mods:
+            argv += ["--served-model-name", f"{name}-base", "--enable-lora", "--max-loras", str(len(mods)),
+                     "--lora-modules", *[f"{k}={v}" for k, v in mods.items()]]
+        else:
+            argv += ["--served-model-name", name]
+        return EngineLaunch(engine, weights, name, [*argv, *s.args])
+    argv = [_bin("mlx_lm.server", "mlx"), "--model", weights, "--host", s.host, "--port", str(port)]
+    if adapter:
+        argv += ["--adapter-path", adapter]
+    return EngineLaunch(engine, weights, weights, [*argv, *s.args])
 
 
 def _bin(exe: str, engine: str) -> str:

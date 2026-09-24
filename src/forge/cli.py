@@ -106,6 +106,121 @@ def cmd_logs(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_train(args: argparse.Namespace) -> int:
+    import time
+
+    from .interfaces import JobState
+    from .train import submit_training
+    from .train.jobs import LocalJobRunner
+
+    cfg = _load_ok(args.file)
+    if cfg is None:
+        return 1
+    sub = submit_training(cfg, args.model)
+    p = sub.plan
+    print(f"{sub.version.tag}: {sub.snapshot.train} train / {sub.snapshot.valid} valid rows "
+          f"({sub.snapshot.held_out} held out, {sub.snapshot.audit} audit, never trained on)")
+    print(f"plan: {p.engine} LoRA r={p.rank} alpha={p.alpha} lr={p.learning_rate:g} iters={p.iters} "
+          f"batch={p.batch_size}x{p.grad_accumulation} seq={p.max_seq_len}"
+          f"{' 4-bit' if p.quantize else ''}")
+    for note in p.notes:
+        print(f"  - {note}")
+    print(f"job {sub.job_id} queued")
+    if args.detach:
+        print(f"forge jobs -f {args.file}   # to follow it")
+        return 0
+    runner = LocalJobRunner(cfg)
+    last = ""
+    while True:
+        st = runner.status(sub.job_id)
+        if st.message != last:
+            print(f"[{time.strftime('%H:%M:%S')}] {st.state.value}: {st.message}")
+            last = st.message
+        if st.state in (JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED):
+            break
+        time.sleep(2)
+    from .registry import open_registry
+    from .local.runtime import storage_dir
+    reg = open_registry(storage_dir(cfg))
+    v = reg.get(args.model, sub.version.version)
+    reg.close()
+    if st.state is JobState.FAILED:
+        print(runner.logs(sub.job_id, 30))
+        return 1
+    print(f"{v.tag}: {v.status}. Report: {v.report}")
+    if v.status == "passed":
+        print(f"forge promote {args.model} {v.version} -f {args.file}   # to put it live")
+    return 0 if v.status == "passed" else 3
+
+
+def cmd_jobs(args: argparse.Namespace) -> int:
+    from .train.jobs import LocalJobRunner
+
+    cfg = _load_ok(args.file)
+    if cfg is None:
+        return 1
+    runner = LocalJobRunner(cfg)
+    if args.logs:
+        print(runner.logs(args.logs, args.lines))
+        return 0
+    rows = runner.list()
+    if not rows:
+        print("no jobs")
+    for jid, raw in rows:
+        print(f"{jid:44} {raw['state']:10} {raw.get('message', '')}")
+    return 0
+
+
+def cmd_models(args: argparse.Namespace) -> int:
+    from .local.runtime import storage_dir
+    from .registry import open_registry
+
+    cfg = _load_ok(args.file)
+    if cfg is None:
+        return 1
+    reg = open_registry(storage_dir(cfg))
+    try:
+        versions = reg.list(args.model)
+    finally:
+        reg.close()
+    if not versions:
+        print("no trained versions yet (forge train <model>)")
+    for v in versions:
+        print(f"{v.tag:28} {v.status:10} gate={v.decision or '-':8} data={v.dataset_hash or '-'}  {v.report or ''}")
+    return 0
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    from .local.runtime import restart_engine, storage_dir
+    from .registry import open_registry
+
+    cfg = _load_ok(args.file)
+    if cfg is None:
+        return 1
+    reg = open_registry(storage_dir(cfg))
+    try:
+        version = args.version or max((v.version for v in reg.list(args.model) if v.status == "passed"), default=None)
+        if version is None:
+            print(f"error: {args.model} has no version that passed its gate", file=sys.stderr)
+            return 1
+        try:
+            v = reg.promote(args.model, int(version), force=args.force, reason=args.reason)
+        except PermissionError as e:
+            print(f"refused: {e}", file=sys.stderr)
+            return 3
+    finally:
+        reg.close()
+    print(f"{v.tag} is live")
+    if not restart_engine(cfg, args.model):
+        print("not running; forge up serves it from now on")
+    return 0
+
+
+def cmd_worker(args: argparse.Namespace) -> int:
+    from .train.jobs import run_worker
+    return run_worker(args.file)
+
+
 def cmd_schema(_: argparse.Namespace) -> int:
     print(json.dumps(json_schema(), indent=2))
     return 0
@@ -145,6 +260,35 @@ def main(argv: list[str] | None = None) -> int:
     lg.add_argument("-f", "--file", default="forge.yaml")
     lg.add_argument("-n", "--lines", type=int, default=80)
     lg.set_defaults(fn=cmd_logs)
+
+    t = sub.add_parser("train", help="snapshot data, fine-tune, then gate the new version against the live one")
+    t.add_argument("model")
+    t.add_argument("-f", "--file", default="forge.yaml")
+    t.add_argument("--detach", action="store_true", help="queue the job and return")
+    t.set_defaults(fn=cmd_train)
+
+    j = sub.add_parser("jobs", help="list training jobs, or show one job's log")
+    j.add_argument("-f", "--file", default="forge.yaml")
+    j.add_argument("--logs", metavar="JOB_ID")
+    j.add_argument("-n", "--lines", type=int, default=80)
+    j.set_defaults(fn=cmd_jobs)
+
+    m = sub.add_parser("models", help="list trained versions and their gate results")
+    m.add_argument("model", nargs="?")
+    m.add_argument("-f", "--file", default="forge.yaml")
+    m.set_defaults(fn=cmd_models)
+
+    pr = sub.add_parser("promote", help="put a version live (only if it passed its gate, unless --force)")
+    pr.add_argument("model")
+    pr.add_argument("version", nargs="?", type=int, help="default: the newest version that passed")
+    pr.add_argument("-f", "--file", default="forge.yaml")
+    pr.add_argument("--force", action="store_true")
+    pr.add_argument("--reason")
+    pr.set_defaults(fn=cmd_promote)
+
+    w = sub.add_parser("_worker", help=argparse.SUPPRESS)
+    w.add_argument("-f", "--file", default="forge.yaml")
+    w.set_defaults(fn=cmd_worker)
 
     s = sub.add_parser("schema", help="print the JSON Schema for editor autocomplete")
     s.set_defaults(fn=cmd_schema)

@@ -202,8 +202,9 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
         for name, doc in cfg.models.items():
             port = doc.spec.serve.port or pick_port(taken)
             taken.add(port)
+            live = live_version(cfg, name)
             try:
-                spec = launch(doc, port)
+                spec = launch(doc, port, adapter=live.adapter if live else None)
             except (EngineError, KeyError) as e:
                 raise UpError(str(e)) from None
             host = doc.spec.serve.host
@@ -212,7 +213,8 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
                           spec.argv, spec.model_id)
             services.append(svc)
             write_state(cfg, services)
-            log(f"starting {name}: {spec.engine} {spec.weights} on :{port}")
+            version = f" + {live.tag}" if live else ""
+            log(f"starting {name}: {spec.engine} {spec.weights}{version} on :{port}")
         for svc in services:
             wait_ready(svc, timeout)
             log(f"ready    {svc.name}: {svc.url}")
@@ -251,6 +253,35 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
         state_path(cfg).unlink(missing_ok=True)
         raise
     return services
+
+
+def live_version(cfg: Config, model: str):
+    """The promoted registry version for a Model, if any."""
+    from ..registry import open_registry
+    path = storage_dir(cfg) / "registry.db"
+    if not path.exists():
+        return None
+    reg = open_registry(storage_dir(cfg))
+    try:
+        return reg.live(model)
+    finally:
+        reg.close()
+
+
+def restart_engine(cfg: Config, model: str, timeout: float = 900.0, log=print) -> bool:
+    """Restart a running Model's engine so it serves the current live version. False if it isn't running."""
+    services = read_state(cfg)
+    svc = next((s for s in services if s.kind == "engine" and s.name == model and alive(s.pid)), None)
+    if svc is None:
+        return False
+    live = live_version(cfg, model)
+    spec = launch(cfg.models[model], svc.port, adapter=live.adapter if live else None)
+    stop(svc.pid)
+    svc.pid, svc.argv, svc.model_id = start(spec.argv, Path(svc.log)), spec.argv, spec.model_id
+    write_state(cfg, services)
+    wait_ready(svc, timeout)
+    log(f"ready    {model}: now serving {live.tag if live else 'the base model'}")
+    return True
 
 
 def down(cfg: Config, log=print) -> int:
