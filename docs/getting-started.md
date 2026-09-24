@@ -3,8 +3,8 @@
 ## Install
 
 ```bash
-git clone <repo> forge && cd forge
-uv sync --extra gateway          # or: pip install 'forge-ml[gateway]'
+git clone <repo> ookami && cd ookami
+uv sync --extra gateway          # or: pip install 'ookami[gateway]'
 ```
 
 Install an inference engine for your hardware:
@@ -19,22 +19,22 @@ Optional extras:
 
 | Extra | For |
 |---|---|
-| `forge-ml[train-cuda]` | TRL training on NVIDIA |
-| `forge-ml[parquet]` | Parquet data sources |
-| `forge-ml[hf]` | Hugging Face data sources |
+| `ookami[train-cuda]` | TRL training on NVIDIA |
+| `ookami[parquet]` | Parquet data sources |
+| `ookami[hf]` | Hugging Face data sources |
 
 ## 1. Serve an open model
 
 ```yaml
-# forge.yaml
-apiVersion: forge.dev/v1alpha1
+# ookami.yaml
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: my-box }
 spec:
-  storage: { uri: ./.forge }
+  storage: { uri: ./.ookami }
   components: { training: { enabled: false } }
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: qwen-4b }
 spec:
@@ -42,12 +42,12 @@ spec:
 ```
 
 ```bash
-forge validate                   # checks the file; errors and warnings, all at once
-forge up                         # engine + gateway in the background
+ookami validate                   # checks the file; errors and warnings, all at once
+ookami up                         # engine + gateway in the background
 curl localhost:4000/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model": "qwen-4b", "messages": [{"role": "user", "content": "hi"}]}'
-forge status
-forge down
+ookami status
+ookami down
 ```
 
 - **The engine is picked for you:** MLX on a Mac, vLLM on NVIDIA.
@@ -60,13 +60,13 @@ The quickstart in `examples/ticket-routing` teaches a model made-up queue codes 
 ```bash
 cd examples/ticket-routing
 python make_data.py > tickets.jsonl
-forge train router               # snapshot -> LoRA -> gate vs the base model
-forge models router              # every version, its status and gate decision
-forge promote router             # refused unless the gate passed
-forge up                         # serves the live version on :4000
+ookami train router               # snapshot -> LoRA -> gate vs the base model
+ookami models router              # every version, its status and gate decision
+ookami promote router             # refused unless the gate passed
+ookami up                         # serves the live version on :4000
 ```
 
-**What `forge train` prints:**
+**What `ookami train` prints:**
 - the split counts, including the held-out and audit rows it never trains on;
 - the plan the memory planner chose;
 - progress lines;
@@ -79,10 +79,10 @@ forge up                         # serves the live version on :4000
 
 ## 3. Gate any two endpoints
 
-`forge eval` works without training. It compares two OpenAI-compatible endpoints on your own evaluators:
+`ookami eval` works without training. It compares two OpenAI-compatible endpoints on your own evaluators:
 
 ```bash
-forge eval -f examples/benchmark.yaml \
+ookami eval -f examples/benchmark.yaml \
   --candidate openai:http://localhost:8000/v1#my-finetune \
   --incumbent openai:http://localhost:8001/v1#base-model
 ```
@@ -91,6 +91,6 @@ It's usable in CI: exit `0` means pass, `3` means fail.
 
 ## Next
 
-- [Configuration reference](reference/forge-yaml.md)
+- [Configuration reference](reference/ookami-yaml.md)
 - [Evaluation](evaluation.md)
 - [Training](training.md)

@@ -1,0 +1,20 @@
+# Ookami inside one pod on any Kubernetes cluster, CPU only: llama.cpp serves a small model behind LiteLLM.
+apiVersion: ookami.dev/v1alpha1
+kind: Platform
+metadata: { name: k8s-smoke }
+spec:
+  storage: { uri: /work/.ookami }
+  gateway: { port: 4000 }
+  components: { training: { enabled: false } }
+---
+apiVersion: ookami.dev/v1alpha1
+kind: Model
+metadata: { name: qwen-05b }
+spec:
+  base: qwen2.5-0.5b-instruct
+  licence: Apache-2.0
+  weights: Qwen/Qwen2.5-0.5B-Instruct-GGUF:Q4_K_M
+  serve:
+    engine: command
+    command: "/app/llama-server -hf {weights} --host {host} --port {port} -c 4096 --alias {name}"
+    modelId: qwen-05b

@@ -2,10 +2,10 @@ import json
 
 from conftest import model_doc, score_rows
 
-from forge.cli import main
-from forge.config import load
-from forge.eval_runner import run_eval, save
-from forge.evaluators.base import Target
+from ookami.cli import main
+from ookami.config import load
+from ookami.eval_runner import run_eval, save
+from ookami.evaluators.base import Target
 
 
 def rows_fixture(write, n=1200):  # audit slices need >= minItems rows
@@ -23,7 +23,7 @@ EV = """
 splits: { heldOut: 0.2, audit: 0.1, stratifyBy: [route] }
 evaluators:
   - labels: { column: label }
-  - forge/structural
+  - ookami/structural
 gate: { minItems: 20, resamples: 1000 }
 """
 
@@ -48,7 +48,7 @@ def test_row_eval_pass_and_per_slice_block(write, tmp_path):
 
 def test_non_gating_evaluator_is_reported_only(write, tmp_path):
     rows_fixture(write)
-    ev = EV.replace("  - forge/structural", "  - forge/structural\n  - labels: { column: route }\n    gate: false")
+    ev = EV.replace("  - ookami/structural", "  - ookami/structural\n  - labels: { column: route }\n    gate: false")
     cfg = load(write("f.yaml", model_doc(ev)))
     t = Target.parse(f"results:{tmp_path / 'inc.jsonl'}", "candidate")
     rep = run_eval(cfg, "m", t, Target.parse(f"results:{tmp_path / 'inc.jsonl'}", "incumbent"))

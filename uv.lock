@@ -998,58 +998,6 @@ wheels = [
 ]
 
 [[package]]
-name = "forge-ml"
-version = "0.2.0.dev0"
-source = { editable = "." }
-dependencies = [
-    { name = "pydantic" },
-    { name = "pyyaml" },
-]
-
-[package.optional-dependencies]
-gateway = [
-    { name = "litellm", extra = ["proxy"] },
-]
-hf = [
-    { name = "datasets" },
-]
-parquet = [
-    { name = "pyarrow" },
-]
-train-cuda = [
-    { name = "bitsandbytes" },
-    { name = "datasets" },
-    { name = "peft" },
-    { name = "torch" },
-    { name = "transformers" },
-    { name = "trl" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "bitsandbytes", marker = "extra == 'train-cuda'", specifier = ">=0.45" },
-    { name = "datasets", marker = "extra == 'hf'", specifier = ">=3" },
-    { name = "datasets", marker = "extra == 'train-cuda'", specifier = ">=3" },
-    { name = "litellm", extras = ["proxy"], marker = "extra == 'gateway'", specifier = ">=1.83,<2" },
-    { name = "peft", marker = "extra == 'train-cuda'", specifier = ">=0.15" },
-    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=15" },
-    { name = "pydantic", specifier = ">=2.6" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "torch", marker = "extra == 'train-cuda'" },
-    { name = "transformers", marker = "extra == 'train-cuda'", specifier = ">=4.50" },
-    { name = "trl", marker = "extra == 'train-cuda'", specifier = ">=0.20" },
-]
-provides-extras = ["gateway", "parquet", "hf", "train-cuda"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8" }]
-
-[[package]]
 name = "frozenlist"
 version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2589,6 +2537,58 @@ sdist = { url = "https://files.pythonhosted.org/packages/0b/5f/19930f824ffeb0ad4
 wheels = [
     { url = "https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1", size = 160065, upload-time = "2025-06-19T22:48:06.508Z" },
 ]
+
+[[package]]
+name = "ookami"
+version = "0.2.0.dev0"
+source = { editable = "." }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+gateway = [
+    { name = "litellm", extra = ["proxy"] },
+]
+hf = [
+    { name = "datasets" },
+]
+parquet = [
+    { name = "pyarrow" },
+]
+train-cuda = [
+    { name = "bitsandbytes" },
+    { name = "datasets" },
+    { name = "peft" },
+    { name = "torch" },
+    { name = "transformers" },
+    { name = "trl" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bitsandbytes", marker = "extra == 'train-cuda'", specifier = ">=0.45" },
+    { name = "datasets", marker = "extra == 'hf'", specifier = ">=3" },
+    { name = "datasets", marker = "extra == 'train-cuda'", specifier = ">=3" },
+    { name = "litellm", extras = ["proxy"], marker = "extra == 'gateway'", specifier = ">=1.83,<2" },
+    { name = "peft", marker = "extra == 'train-cuda'", specifier = ">=0.15" },
+    { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=15" },
+    { name = "pydantic", specifier = ">=2.6" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "torch", marker = "extra == 'train-cuda'" },
+    { name = "transformers", marker = "extra == 'train-cuda'", specifier = ">=4.50" },
+    { name = "trl", marker = "extra == 'train-cuda'", specifier = ">=0.20" },
+]
+provides-extras = ["gateway", "parquet", "hf", "train-cuda"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "openai"

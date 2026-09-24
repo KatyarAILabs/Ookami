@@ -1,6 +1,7 @@
 """A toy benchmark showing the `command` evaluator contract: call the model, write one JSONL line per item."""
 import argparse
 import json
+import os
 import urllib.request
 
 ITEMS = [("capital-fr", "What is the capital of France? One word.", "paris"),
@@ -9,8 +10,10 @@ ITEMS = [("capital-fr", "What is the capital of France? One word.", "paris"),
 
 def ask(base_url: str, model: str, prompt: str) -> str:
     body = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0}
-    req = urllib.request.Request(f"{base_url}/chat/completions", json.dumps(body).encode(),
-                                 {"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json"}
+    if os.environ.get("OOKAMI_API_KEY"):          # needed when calling an Ookami gateway
+        headers["Authorization"] = f"Bearer {os.environ['OOKAMI_API_KEY']}"
+    req = urllib.request.Request(f"{base_url}/chat/completions", json.dumps(body).encode(), headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read())["choices"][0]["message"]["content"] or ""
 

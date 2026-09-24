@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: forge-gpu
-  namespace: forge-test
+  name: ookami-gpu
+  namespace: ookami-test
 spec:
   restartPolicy: Never
   tolerations:
@@ -10,7 +10,7 @@ spec:
     - { key: kubernetes.azure.com/scalesetpriority, operator: Equal, value: spot, effect: NoSchedule }
   nodeSelector: { agentpool: gpuspot }
   containers:
-    - name: forge
+    - name: ookami
       image: vllm/vllm-openai:latest
       command: ["/bin/bash", "/config/run.sh"]
       resources:
@@ -21,7 +21,7 @@ spec:
         - { name: work, mountPath: /work }
         - { name: shm, mountPath: /dev/shm }
   volumes:
-    - { name: config, configMap: { name: forge-gpu-config } }
-    - { name: wheel, configMap: { name: forge-wheel } }
+    - { name: config, configMap: { name: ookami-gpu-config } }
+    - { name: wheel, configMap: { name: ookami-wheel } }
     - { name: work, emptyDir: {} }
     - { name: shm, emptyDir: { medium: Memory, sizeLimit: 4Gi } }

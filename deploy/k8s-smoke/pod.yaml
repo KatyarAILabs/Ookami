@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: forge-smoke
-  namespace: forge-test
-  labels: { app: forge-smoke }
+  name: ookami-smoke
+  namespace: ookami-test
+  labels: { app: ookami-smoke }
 spec:
   restartPolicy: Never
   containers:
-    - name: forge
+    - name: ookami
       image: ghcr.io/ggml-org/llama.cpp:full
       command: ["/bin/bash", "/config/smoke.sh"]
       env:
@@ -21,6 +21,6 @@ spec:
         - { name: wheel, mountPath: /wheel }
         - { name: work, mountPath: /work }
   volumes:
-    - { name: config, configMap: { name: forge-smoke-config } }
-    - { name: wheel, configMap: { name: forge-wheel } }
+    - { name: config, configMap: { name: ookami-smoke-config } }
+    - { name: wheel, configMap: { name: ookami-wheel } }
     - { name: work, emptyDir: {} }

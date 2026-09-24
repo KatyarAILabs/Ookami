@@ -1,5 +1,5 @@
 """Example RL reward. Kept separate from the gate evaluator so GRPO can't game the gate."""
-from forge import evaluator
+from ookami import evaluator
 
 
 @evaluator(name="reward", version="1")

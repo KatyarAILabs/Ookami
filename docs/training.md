@@ -1,6 +1,6 @@
 # Training
 
-`forge train MODEL` does four things, in this order.
+`ookami train MODEL` does four things, in this order.
 
 ```mermaid
 flowchart LR
@@ -21,8 +21,8 @@ flowchart LR
 | Source | Form |
 |---|---|
 | `jsonl` | A JSONL file |
-| `parquet` | A Parquet file or directory (needs `forge-ml[parquet]`) |
-| `hf` | A Hugging Face dataset, `name` or `name:split` (needs `forge-ml[hf]`) |
+| `parquet` | A Parquet file or directory (needs `ookami[parquet]`) |
+| `hf` | A Hugging Face dataset, `name` or `name:split` (needs `ookami[hf]`) |
 | `traces` | Traffic captured by Trajectory: `cc export -format chat` on the lake (see below) |
 
 **Row format:**
@@ -47,7 +47,7 @@ data:
     traces: { minReward: 1 }        # lake defaults to Platform.tracing.lake
 ```
 
-**What Forge runs:** `cc export -lake <lake> -format chat -require-final=false` before each snapshot, plus these filters when set:
+**What Ookami runs:** `cc export -lake <lake> -format chat -require-final=false` before each snapshot, plus these filters when set:
 
 | Field | Keeps |
 |---|---|
@@ -96,13 +96,13 @@ The plan and its reasoning are printed before training starts.
 
 ## 3. Queue and train
 
-- **Queue:** jobs go to `<storage>/jobs/`. `forge train` starts a background worker if none is running.
+- **Queue:** jobs go to `<storage>/jobs/`. `ookami train` starts a background worker if none is running.
 - **One job at a time:** the worker holds `jobs/worker.lock` and runs jobs one after another, so peak memory stays at one job's size.
 
 | Trainer (`train.engine`) | Runs | Writes |
 |---|---|---|
 | `mlx` | `mlx_lm.lora -c jobs/<id>/mlx.yaml` (LoRA, prompt masked, checkpoints every ~10%) | `adapters.safetensors`, then `fused/` |
-| `trl` | `python -m forge.train.trl_sft job.json`: TRL `SFTTrainer` + PEFT LoRA on all linear layers; 4-bit QLoRA when planned; bf16 where supported, else fp16 | PEFT adapter, `checkpoints/` |
+| `trl` | `python -m ookami.train.trl_sft job.json`: TRL `SFTTrainer` + PEFT LoRA on all linear layers; 4-bit QLoRA when planned; bf16 where supported, else fp16 | PEFT adapter, `checkpoints/` |
 | `command` | Your `train.command` with `{job}` (the path to `job.json`) | Whatever your trainer writes to `adapter_dir` |
 | `auto` | `mlx` on Apple silicon, `trl` on NVIDIA | - |
 
@@ -125,7 +125,7 @@ The plan and its reasoning are printed before training starts.
   - MLX or command: two processes.
 - **Evaluate:** it runs the Model's evaluators on held-out and audit rows (see [evaluation](evaluation.md)).
 - **Record:** it writes the report and sets the version to `passed` or `rejected`.
-- **Next step:** `forge promote` puts a passing version live.
+- **Next step:** `ookami promote` puts a passing version live.
 
 ## Statuses
 

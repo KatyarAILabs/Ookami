@@ -7,7 +7,7 @@ about: Something doesn't work as documented
 
 **What you expected**
 
-**forge.yaml** (secrets removed)
+**ookami.yaml** (secrets removed)
 ```yaml
 ```
 
@@ -15,4 +15,4 @@ about: Something doesn't work as documented
 ```
 ```
 
-**Environment:** forge version, OS, accelerator (GPU model or Apple silicon), engine and version
+**Environment:** ookami version, OS, accelerator (GPU model or Apple silicon), engine and version

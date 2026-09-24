@@ -1,5 +1,5 @@
 """Example customer evaluator: the customer's own definition of a correct answer."""
-from forge import Score, evaluator
+from ookami import Score, evaluator
 
 
 @evaluator(name="task_check", version="1")

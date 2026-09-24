@@ -11,9 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with: { python-version: "${{ matrix.python }}" }
-      - run: uv sync
+      - run: uv sync --extra gateway
       - run: uv run pytest -q
       - name: config reference is up to date
         run: uv run python scripts/gen_config_reference.py --check
       - name: examples validate
-        run: for f in examples/*.yaml deploy/*/forge.yaml; do uv run forge validate -f "$f" || exit 1; done
+        run: for f in examples/*.yaml deploy/*/ookami.yaml; do uv run ookami validate -f "$f" || exit 1; done

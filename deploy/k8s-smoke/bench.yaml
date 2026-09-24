@@ -1,10 +1,10 @@
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: k8s-smoke-bench }
 spec:
-  storage: { uri: /work/.forge-bench }
+  storage: { uri: /work/.ookami-bench }
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: qwen-05b }
 spec:

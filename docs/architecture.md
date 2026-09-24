@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart TB
-    cfg["forge.yaml<br/>Platform + Model documents"] --> cli["forge CLI / controller<br/>validate · up · train · eval · promote"]
+    cfg["ookami.yaml<br/>Platform + Model documents"] --> cli["ookami CLI / controller<br/>validate · up · train · eval · promote"]
     cli --> jr["JobRunner"]
     cli --> ms["ModelServer"]
     cli --> rt["Router"]
@@ -21,10 +21,10 @@ flowchart TB
     lake -. "cc export -format chat" .-> worker
 ```
 
-- **One config file.** `forge.yaml` holds two kinds of document:
+- **One config file.** `ookami.yaml` holds two kinds of document:
   - **`Platform`**: one per install. It sets storage, the gateway, which components run, and compute.
   - **`Model`**: one per model. It names the base model to serve and, optionally, data, training, eval and hand-off.
-- **One schema.** The Pydantic schema in `src/forge/config.py` is the only definition of that file. The JSON Schema (`forge schema`) and the [reference docs](reference/forge-yaml.md) are generated from it. The Kubernetes CRDs will be too.
+- **One schema.** The Pydantic schema in `src/ookami/config.py` is the only definition of that file. The JSON Schema (`ookami schema`) and the [reference docs](reference/ookami-yaml.md) are generated from it. The Kubernetes CRDs will be too.
 - **Backends implement a few narrow interfaces**, so the same config and commands can drive one machine today and Kubernetes or SkyPilot later. Only the `local` backend exists so far.
 
 ## Components
@@ -36,7 +36,7 @@ flowchart TB
 | training | done (SFT) | Versioned data snapshots, memory planner, one-job queue, trainers (MLX, TRL, command), checkpoints |
 | eval | done | Frozen splits, candidate vs incumbent, paired bootstrap, gate, reports |
 | registry | done | Every version with its data hash, config hash, gate decision, report and status; event log |
-| tracing | done, via [Trajectory](https://github.com/KatyarAILabs/trajectory) | Forge runs (or points at) a Trajectory collector and wires the gateway's LiteLLM `generic_api` callback to it. `data.source.traces` trains on the lake through `cc export -format chat` |
+| tracing | done, via [Trajectory](https://github.com/KatyarAILabs/trajectory) | Ookami runs (or points at) a Trajectory collector and wires the gateway's LiteLLM `generic_api` callback to it. `data.source.traces` trains on the lake through `cc export -format chat` |
 | hand-off | planned (0.3) | Shadow, canary, live and rollback at the gateway |
 | console | planned (0.5) | Web UI |
 
@@ -55,14 +55,14 @@ flowchart TB
 
 ```mermaid
 stateDiagram-v2
-    [*] --> training: forge train
+    [*] --> training: ookami train
     training --> failed: trainer crashed or wrote no adapter
     training --> evaluating: adapter packaged (mlx - fused)
     evaluating --> passed: gate pass
     evaluating --> rejected: gate partial or fail
     evaluating --> failed: gate could not run
-    passed --> promoted: forge promote
-    rejected --> promoted: forge promote --force --reason
+    passed --> promoted: ookami promote
+    rejected --> promoted: ookami promote --force --reason
     promoted --> retired: another version promoted
     failed --> [*]
     rejected --> [*]
@@ -72,13 +72,13 @@ stateDiagram-v2
 ```mermaid
 sequenceDiagram
     actor U as You
-    participant CLI as forge train
+    participant CLI as ookami train
     participant Q as Job queue
     participant W as Worker
     participant T as Trainer
     participant G as Gate
     participant R as Registry
-    U->>CLI: forge train router
+    U->>CLI: ookami train router
     CLI->>CLI: snapshot data (held-out + audit excluded)
     CLI->>CLI: plan LoRA for this machine
     CLI->>R: create vN (training)
@@ -89,7 +89,7 @@ sequenceDiagram
     W->>G: serve vN and the incumbent side by side
     G->>G: run evaluators, paired bootstrap per split and slice
     G->>R: vN passed or rejected, report path
-    U->>CLI: forge promote router
+    U->>CLI: ookami promote router
     CLI->>R: vN promoted, previous live retired
 ```
 
@@ -121,7 +121,7 @@ Everything lives under `Platform.spec.storage.uri`:
 | `catalog.py` | Known base models: licence, weights per engine, parameter count |
 | `data.py` | Loading sources, splits, training snapshots, getting outputs from targets |
 | `stats.py` | Paired bootstrap, gate tests |
-| `eval_runner.py` | `forge eval`, reports |
+| `eval_runner.py` | `ookami eval`, reports |
 | `evaluators/` | Evaluator SDK, built-ins, plugin loading |
 | `local/engines.py` | Engine command lines (vllm, mlx, command) |
 | `local/runtime.py` | Process supervision: up, down, status, restart |
@@ -137,11 +137,11 @@ Everything lives under `Platform.spec.storage.uri`:
 
 | Decision | Why |
 |---|---|
-| Customers bring the evaluators; Forge never judges correctness | Scores that only measure agreement with the old model reward imitation, not quality. Forge supplies the statistics and the gate |
+| Customers bring the evaluators; Ookami never judges correctness | Scores that only measure agreement with the old model reward imitation, not quality. Ookami supplies the statistics and the gate |
 | Training needs an eval section | A trained model can only be promoted through the gate |
 | One training job at a time | Peak GPU memory stays at one job's size, so hardware and cost stay predictable |
 | Hash-based splits per group of identical inputs | A row never changes split as data grows, and a test prompt can't leak into training |
 | Serve fused MLX models | mlx-lm 0.31's server ignores `--adapter-path` unless every request names the adapter (see [verification](verification.md)) |
 | Few bundled services; bring your own Postgres and bucket in production | Supporting many stateful services on users' clusters is costly |
 | Only Apache-2.0 / MIT / BSD dependencies | So security teams can approve the SBOM |
-| Tracing is Trajectory, not a Forge component | Capture, redaction, outcome joins and rewards are a separate open-source project. Forge runs it and reads its exports rather than duplicating it; the redaction policy stays the user's own Trajectory config |
+| Tracing is Trajectory, not a Ookami component | Capture, redaction, outcome joins and rewards are a separate open-source project. Ookami runs it and reads its exports rather than duplicating it; the redaction policy stays the user's own Trajectory config |

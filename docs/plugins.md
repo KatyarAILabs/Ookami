@@ -1,22 +1,22 @@
 # Evaluator plugins
 
-Evaluators can ship as separate Python packages, so you can extend the gate without forking Forge.
+Evaluators can ship as separate Python packages, so you can extend the gate without forking Ookami.
 
 ## Writing one
 
-Register a factory under the `forge.evaluators` entry point group:
+Register a factory under the `ookami.evaluators` entry point group:
 
 ```toml
 # your package's pyproject.toml
-[project.entry-points."forge.evaluators"]
-"acme.refund_check" = "acme_forge:refund_check"
+[project.entry-points."ookami.evaluators"]
+"acme.refund_check" = "acme_ookami:refund_check"
 ```
 
-The factory receives `name`, `base_dir` (the directory of `forge.yaml`) and the parameters from the YAML. It returns an evaluator:
+The factory receives `name`, `base_dir` (the directory of `ookami.yaml`) and the parameters from the YAML. It returns an evaluator:
 
 ```python
-# acme_forge/__init__.py
-from forge import Score
+# acme_ookami/__init__.py
+from ookami import Score
 
 class RefundCheck:
     kind = "plugin"

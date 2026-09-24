@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from forge.cli import main
-from forge.config import load
-from forge.data import snapshot
-from forge.interfaces import JobState, JobStatus
-from forge.local.runtime import read_state
-from forge.registry import Registry
-from forge.train.backends import argv_for
-from forge.train.jobs import LocalJobRunner, _recover
-from forge.train.planner import plan
+from ookami.cli import main
+from ookami.config import load
+from ookami.data import snapshot
+from ookami.interfaces import JobState, JobStatus
+from ookami.local.runtime import read_state
+from ookami.registry import Registry
+from ookami.train.backends import argv_for
+from ookami.train.jobs import LocalJobRunner, _recover
+from ookami.train.planner import plan
 
 HERE = Path(__file__).parent
 PY = sys.executable
@@ -22,14 +22,14 @@ def config(write, n=1200, min_examples=100, extra_train=""):
     rows = [{"id": f"r{i}", "prompt": f"question {i}", "label": "ok"} for i in range(n)]
     write("data.jsonl", "\n".join(json.dumps(r) for r in rows))
     return write("f.yaml", f"""
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: {{ name: t }}
 spec:
   storage: {{ uri: ./store }}
   gateway: {{ mode: none }}
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: {{ name: m }}
 spec:
@@ -73,7 +73,7 @@ def test_planner_fits_memory_and_honours_overrides(write):
 
 
 def test_mlx_argv_writes_config_and_resumes(tmp_path, monkeypatch):
-    from forge.train import backends
+    from ookami.train import backends
     monkeypatch.setattr(backends.shutil, "which", lambda exe: f"/bin/{exe}")
     adapter = tmp_path / "adapter"
     adapter.mkdir()
@@ -89,7 +89,7 @@ def test_mlx_argv_writes_config_and_resumes(tmp_path, monkeypatch):
 
 
 def load_spec_stub():
-    from forge.config import ModelSpec
+    from ookami.config import ModelSpec
     return ModelSpec.model_validate({"base": "qwen3.5-4b"})
 
 

@@ -5,10 +5,10 @@ Only the `local` backend exists today. It runs on one machine: a laptop, a GPU V
 ```mermaid
 flowchart LR
     subgraph one["One machine (laptop or GPU VM)"]
-        f1["forge up / train"] --> p1["engine + gateway + worker<br/>processes"]
+        f1["ookami up / train"] --> p1["engine + gateway + worker<br/>processes"]
     end
     subgraph pod["Kubernetes pod (k8s-smoke, k8s-gpu)"]
-        f2["forge in a container<br/>wheel from a ConfigMap"] --> p2["same processes<br/>inside the pod"]
+        f2["ookami in a container<br/>wheel from a ConfigMap"] --> p2["same processes<br/>inside the pod"]
     end
     subgraph aws["AWS spot GPU (aws-gpu)"]
         f3["aws.sh up · test · down"] --> p3["vllm/vllm-openai container<br/>on a g5.xlarge"]
@@ -19,8 +19,8 @@ flowchart LR
 ## One machine
 
 ```bash
-pip install 'forge-ml[gateway]'   # plus vllm or mlx-lm, and forge-ml[train-cuda] to train on NVIDIA
-forge up -f forge.yaml
+pip install 'ookami[gateway]'   # plus vllm or mlx-lm, and ookami[train-cuda] to train on NVIDIA
+ookami up -f ookami.yaml
 ```
 
 **What `local` needs:**
@@ -29,10 +29,10 @@ forge up -f forge.yaml
 
 ## Kubernetes pod, CPU smoke test (`deploy/k8s-smoke/`)
 
-Runs Forge's local backend inside one pod on any cluster:
+Runs Ookami's local backend inside one pod on any cluster:
 - llama.cpp serves Qwen2.5-0.5B (GGUF) through `serve.engine: command`, behind the managed LiteLLM gateway;
 - a chat call goes through the gateway;
-- `forge eval` gates it.
+- `ookami eval` gates it.
 
 **No container registry needed:** the wheel and the config are mounted from ConfigMaps. See `deploy/k8s-smoke/README.md`.
 
@@ -51,7 +51,7 @@ deploy/aws-gpu/aws.sh down     # terminates the instance, deletes the security g
 ```
 
 - **What `test.sh` covers:** validate, vLLM serving, TRL training, the gate with vLLM multi-LoRA, promote, serving the trained version, and four routing calls through the gateway.
-- **Tagging:** everything is tagged `project=forge-test`.
+- **Tagging:** everything is tagged `project=ookami-test`.
 - **Permissions:** `iam-policy.json` is the least-privilege IAM policy the kit needs. It can only terminate instances with that tag.
 - **Quota:** the account needs at least 4 vCPUs of "All G and VT Spot Instance Requests" quota in the region. New accounts start at 0.
 - **Settings:** `REGION`, `TYPE` and `AWS` can be overridden with environment variables.

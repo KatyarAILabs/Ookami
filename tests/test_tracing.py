@@ -4,9 +4,9 @@ import socket
 import sys
 from pathlib import Path
 
-from forge.config import load
-from forge.data import load_source, snapshot
-from forge.local.runtime import down, up
+from ookami.config import load
+from ookami.data import load_source, snapshot
+from ookami.local.runtime import down, up
 
 HERE = Path(__file__).parent
 PY = sys.executable
@@ -28,7 +28,7 @@ def chat_lake(d: Path, n: int = 400) -> Path:
 
 def platform(extra: str) -> str:
     return f"""
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: {{ name: t }}
 spec:
@@ -40,7 +40,7 @@ spec:
 def test_traces_source_exports_chat_from_the_lake(write, tmp_path):
     chat_lake(tmp_path / "lake")
     f = write("f.yaml", platform(f"  tracing: {{ mode: external, lake: ./lake, bin: '{HERE / 'fake_cc.py'}' }}") + """---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: m }
 spec:
@@ -74,7 +74,7 @@ def test_up_runs_the_collector_and_wires_the_gateway(write, tmp_path):
     healthUrl: http://127.0.0.1:{hp}/healthz
     webhook: http://127.0.0.1:4320/v1/hooks/litellm
   gateway: {{ port: {gp}, command: "{gateway_cmd}" }}""") + f"""---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: {{ name: m }}
 spec:
@@ -94,7 +94,7 @@ spec:
 
 
 def test_token_env_must_be_set(write, tmp_path, monkeypatch):
-    from forge.local.runtime import UpError, tracing_env
+    from ookami.local.runtime import UpError, tracing_env
     cfg = load(write("f.yaml", platform("  tracing: { mode: external, lake: ./l, tokenEnv: CC_TOKEN_X }")))
     monkeypatch.delenv("CC_TOKEN_X", raising=False)
     import pytest

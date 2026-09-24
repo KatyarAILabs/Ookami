@@ -1,5 +1,5 @@
 """Your definition of a good answer for the gate. Replace with a real check for your task."""
-from forge import Score, evaluator
+from ookami import Score, evaluator
 
 
 @evaluator(name="check", version="1")

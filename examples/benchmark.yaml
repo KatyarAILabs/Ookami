@@ -1,13 +1,13 @@
 # Gate a candidate with your own benchmark harness (any command that writes per-item scores).
-#   forge eval -f examples/benchmark.yaml --candidate openai:http://localhost:8000/v1#my-model \
+#   ookami eval -f examples/benchmark.yaml --candidate openai:http://localhost:8000/v1#my-model \
 #                                         --incumbent openai:http://localhost:8001/v1#base-model
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: bench }
 spec:
-  storage: { uri: ./.forge }
+  storage: { uri: ./.ookami }
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: my-model }
 spec:

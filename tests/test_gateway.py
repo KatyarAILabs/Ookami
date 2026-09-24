@@ -5,14 +5,14 @@ import time
 
 import pytest
 
-from forge.gateway.keys import KeyStore, hash_key, month_start, usage_report
+from ookami.gateway.keys import KeyStore, hash_key, month_start, usage_report
 
-litellm_hooks = pytest.importorskip("forge.gateway.litellm_hooks", reason="needs forge-ml[gateway]")
+litellm_hooks = pytest.importorskip("ookami.gateway.litellm_hooks", reason="needs ookami[gateway]")
 
 
 @pytest.fixture
 def hooks(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_STORAGE", str(tmp_path))
+    monkeypatch.setenv("OOKAMI_STORAGE", str(tmp_path))
     monkeypatch.setattr(litellm_hooks, "_store", None)
     litellm_hooks._windows.clear()
     return litellm_hooks
@@ -29,7 +29,7 @@ def status(fn, *a):
 def test_master_key_is_generated_private_and_stable(tmp_path):
     ks = KeyStore(tmp_path)
     m = ks.master_key()
-    assert m.startswith("fk-master-") and ks.master_key() == m
+    assert m.startswith("ook-master-") and ks.master_key() == m
     assert stat.S_IMODE(os.stat(tmp_path / "secrets" / "master_key").st_mode) == 0o600
 
 
@@ -49,7 +49,7 @@ def test_auth_decisions(hooks, tmp_path):
     broke = ks.create("bob", "ops", budget_usd=1.0)
     ks.record(hash_key(broke), "ops", "m", 10, 10, 1.5, 5, True)
     assert status(hooks.check, "") == 401
-    assert status(hooks.check, "fk-nope") == 401
+    assert status(hooks.check, "ook-nope") == 401
     assert hooks.check(f"Bearer {master}").team_id == "admin"
     now = time.time()
     assert [status(hooks.check, k, now), status(hooks.check, k, now + 1), status(hooks.check, k, now + 2)] == [200, 200, 429]
@@ -84,23 +84,23 @@ def test_usage_splits_hardware_cost_by_tokens(tmp_path):
 
 
 def test_gateway_config_has_auth_usage_and_providers(write):
-    from forge.config import load
-    from forge.local.runtime import Service, gateway_config
+    from ookami.config import load
+    from ookami.local.runtime import Service, gateway_config
     cfg = load(write("f.yaml", """
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: t }
 spec: { storage: { uri: ./s } }
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: gpt }
 spec: { provider: { name: openai, model: gpt-5-mini, apiKey: "${secret:OPENAI_API_KEY}" } }
 """))
     assert cfg.ok, cfg.issues
     eng = Service("local", "engine", 1, 8100, "http://127.0.0.1:8100/v1", "", "", [], "default_model")
-    conf = gateway_config([eng], providers=[cfg.models["gpt"]], master_key="fk-master-x", usage=True)
+    conf = gateway_config([eng], providers=[cfg.models["gpt"]], master_key="ook-master-x", usage=True)
     names = {m["model_name"]: m["litellm_params"] for m in conf["model_list"]}
     assert names["gpt"] == {"model": "openai/gpt-5-mini", "api_key": "os.environ/OPENAI_API_KEY"}
     assert conf["general_settings"]["custom_auth"].endswith("user_api_key_auth")
-    assert conf["litellm_settings"]["callbacks"] == ["forge.gateway.litellm_hooks.usage_logger"]
+    assert conf["litellm_settings"]["callbacks"] == ["ookami.gateway.litellm_hooks.usage_logger"]

@@ -7,7 +7,7 @@ schema_version: "0.2.0"
 tenant: dev
 
 sources:
-  # LiteLLM's generic_api callback posts here; Forge's managed gateway is wired to it.
+  # LiteLLM's generic_api callback posts here; Ookami's managed gateway is wired to it.
   - name: litellm
     type: webhook
     http: {listen: "127.0.0.1:4320"}
@@ -103,7 +103,7 @@ buffer:
   #
   # It holds only redacted records, so even a seized disk contains no
   # unredacted payloads.
-  dir: ./.forge/trajectory/buffer
+  dir: ./.ookami/trajectory/buffer
   max_bytes: 1Gi
   max_age: 24h
   backpressure_at: 0.8

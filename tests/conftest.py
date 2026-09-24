@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 PLATFORM = """
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: t }
 spec:
@@ -26,7 +26,7 @@ def write(tmp_path: Path):
 def model_doc(eval_block: str, extra: str = "", data: str = "{ jsonl: data.jsonl }", train: str = "recipe: sft",
               base: str = "base: qwen3.5-4b") -> str:
     return PLATFORM + f"""---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: {{ name: m }}
 spec:

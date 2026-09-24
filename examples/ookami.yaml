@@ -1,0 +1,50 @@
+# Full loop on a Kubernetes cluster: capture gateway traffic, fine-tune, gate, hand the route over.
+apiVersion: ookami.dev/v1alpha1
+kind: Platform
+metadata: { name: acme }
+spec:
+  backend: k8s
+  storage:  { uri: s3://acme-ookami }
+  database: { url: "${secret:ookami-pg}" }
+  gateway:
+    mode: external                      # use the LiteLLM you already run
+    type: litellm
+    url: http://litellm.internal:4000
+    adminKey: "${secret:litellm-admin}"
+  components:
+    tracing: { enabled: true }          # capture gateway traffic with Trajectory
+    console: { enabled: true }
+  tracing:
+    mode: external                      # a Trajectory collector you already run
+    lake: s3://acme-traces/lake
+    webhook: https://trajectory.internal:4320/v1/hooks/litellm
+  compute:
+    profile: cloud-eks
+    training: { gpu: H100-80GB, count: 1, capacity: [spot, on-demand], budgetHoursPerWeek: 20 }
+    serving:  { gpu: L4, scaleToZero: true, coldFallback: incumbent }
+---
+apiVersion: ookami.dev/v1alpha1
+kind: Model
+metadata: { name: support-4b }
+spec:
+  base: qwen3.5-4b
+  data:
+    source: { traces: { minReward: 1 } }   # episodes Trajectory scored as successful
+    minExamples: 500
+  train:
+    recipe: sft-then-grpo
+    reward: ./evals/reward.py:score
+    overrides: { lora.rank: 32 }
+  eval:
+    splits: { heldOut: 0.1, audit: 0.05, stratifyBy: [route, tool] }
+    evaluators:
+      - labels: { column: resolved }
+      - python: ./evals/task_check.py:score
+      - ookami/structural
+    gate: { vs: incumbent, test: non-inferiority, margin: -0.01, confidence: 0.95, perSlice: true }
+  handoff:
+    route: { model: gpt-5-mini, match: { route: /support/agent } }
+    stages: [shadow, canary:10%, live]
+    approve: [live]
+    rollback: { metric: task_check, below: 0.90, window: 1h }
+    shadowExecutor: ./evals/task_check.py:score

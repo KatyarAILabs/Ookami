@@ -1,8 +1,8 @@
 import json
 
-from forge.evaluators.base import Example, Score, Target, as_score
-from forge.evaluators.builtin import LabelsEvaluator, PythonEvaluator, StructuralEvaluator
-from forge.evaluators.command import CommandEvaluator, parse_scores
+from ookami.evaluators.base import Example, Score, Target, as_score
+from ookami.evaluators.builtin import LabelsEvaluator, PythonEvaluator, StructuralEvaluator
+from ookami.evaluators.command import CommandEvaluator, parse_scores
 
 from conftest import score_rows
 
@@ -43,7 +43,7 @@ def test_labels():
 
 def test_python_evaluator_loads_customer_code(tmp_path):
     (tmp_path / "ev.py").write_text(
-        "from forge import evaluator\n@evaluator(version='7')\ndef check(example, output):\n    return output == 'ok'\n")
+        "from ookami import evaluator\n@evaluator(version='7')\ndef check(example, output):\n    return output == 'ok'\n")
     ev = PythonEvaluator("c", ref="./ev.py:check", base_dir=tmp_path)
     assert ev.version == "7" and ev.score(Example("1", "q"), "ok").passed
 
@@ -82,8 +82,8 @@ def test_command_runs_live_against_a_target(tmp_path):
 
 
 def test_plugin_evaluator_via_entry_point(monkeypatch, tmp_path):
-    from forge import evaluators as evs
-    from forge.config import EvaluatorSpec
+    from ookami import evaluators as evs
+    from ookami.config import EvaluatorSpec
 
     class EP:
         name = "acme.check"

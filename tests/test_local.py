@@ -4,25 +4,25 @@ from pathlib import Path
 
 import pytest
 
-from forge.cli import main
-from forge.config import load
-from forge.local import engines
-from forge.local.engines import EngineError, launch
-from forge.local.runtime import UpError, alive, down, read_state, status, up
+from ookami.cli import main
+from ookami.config import load
+from ookami.local import engines
+from ookami.local.engines import EngineError, launch
+from ookami.local.runtime import UpError, alive, down, read_state, status, up
 
 FAKE = Path(__file__).with_name("fake_server.py")
 
 
 def doc(write, model_extra: str, platform_extra: str = ""):
     return load(write("f.yaml", f"""
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: {{ name: t }}
 spec:
   storage: {{ uri: ./store }}
 {platform_extra}
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: {{ name: m }}
 spec:
@@ -109,14 +109,14 @@ def test_non_local_backend_and_storage_rejected(write):
 
 def test_cli_up_status_down(write, capsys):
     f = write("c.yaml", f"""
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: {{ name: t }}
 spec:
   storage: {{ uri: ./store }}
   gateway: {{ mode: none }}
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: {{ name: m }}
 spec:

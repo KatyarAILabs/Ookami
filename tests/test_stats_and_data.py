@@ -1,9 +1,9 @@
 import json
 
-from forge.config import Gate, Splits
-from forge.data import assign_splits, load_jsonl
-from forge.evaluators.base import Example
-from forge.stats import judge, paired_bootstrap
+from ookami.config import Gate, Splits
+from ookami.data import assign_splits, load_jsonl
+from ookami.evaluators.base import Example
+from ookami.stats import judge, paired_bootstrap
 
 
 def test_bootstrap_is_deterministic_and_brackets_mean():

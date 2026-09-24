@@ -2,7 +2,7 @@ from pathlib import Path
 
 from conftest import PLATFORM, model_doc
 
-from forge.config import load
+from ookami.config import load
 
 EVAL = """
 evaluators:
@@ -20,7 +20,7 @@ def warnings(cfg):
 
 def test_examples_validate():
     root = Path(__file__).parents[1] / "examples"
-    for f in ("forge.yaml", "serve-only.yaml", "benchmark.yaml"):
+    for f in ("ookami.yaml", "serve-only.yaml", "benchmark.yaml"):
         cfg = load(root / f)
         assert cfg.ok, cfg.issues
 
@@ -111,7 +111,7 @@ def test_reward_reused_as_gate_warns(write):
 
 
 def test_structural_only_gate_warns(write):
-    cfg = load(write("f.yaml", model_doc("evaluators: [forge/structural]\n")))
+    cfg = load(write("f.yaml", model_doc("evaluators: [ookami/structural]\n")))
     assert any("structural checks only" in w for w in warnings(cfg))
 
 
@@ -129,7 +129,7 @@ def test_missing_python_ref_is_an_error(write):
 
 
 SERVE_ONLY = PLATFORM + """---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: s }
 spec:
@@ -180,7 +180,7 @@ def test_external_gateway_needs_url(write):
 
 def test_provider_models(write):
     api = PLATFORM + """---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: gpt }
 spec: { provider: { name: openai, model: gpt-5-mini, apiKey: "${secret:OPENAI_API_KEY}" } }

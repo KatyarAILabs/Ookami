@@ -1,4 +1,4 @@
-"""Generate docs/reference/forge-yaml.md from the Pydantic schema, so the reference can't drift from the code.
+"""Generate docs/reference/ookami-yaml.md from the Pydantic schema, so the reference can't drift from the code.
 
     uv run python scripts/gen_config_reference.py        # rewrite the file
     uv run python scripts/gen_config_reference.py --check  # exit 1 if it is out of date (CI)
@@ -12,9 +12,9 @@ from pathlib import Path
 from pydantic import BaseModel
 from pydantic_core import PydanticUndefined
 
-from forge.config import ModelSpec, PlatformSpec
+from ookami.config import ModelSpec, PlatformSpec
 
-OUT = Path(__file__).resolve().parents[1] / "docs" / "reference" / "forge-yaml.md"
+OUT = Path(__file__).resolve().parents[1] / "docs" / "reference" / "ookami-yaml.md"
 
 
 def type_name(tp) -> str:
@@ -74,9 +74,9 @@ def section(model: type[BaseModel], seen: set, out: list[str]) -> None:
 
 
 def render() -> str:
-    out = ["# forge.yaml reference", "",
-           "_Generated from `src/forge/config.py` by `scripts/gen_config_reference.py`. Do not edit by hand._", "",
-           "A `forge.yaml` holds YAML documents, each with `apiVersion: forge.dev/v1alpha1`, a `kind`, "
+    out = ["# ookami.yaml reference", "",
+           "_Generated from `src/ookami/config.py` by `scripts/gen_config_reference.py`. Do not edit by hand._", "",
+           "A `ookami.yaml` holds YAML documents, each with `apiVersion: ookami.dev/v1alpha1`, a `kind`, "
            "`metadata.name` (lowercase letters, digits and `-`) and a `spec`. Unknown keys are errors.", "",
            "## kind: Platform", ""]
     seen: set = set()

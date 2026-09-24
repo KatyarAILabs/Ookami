@@ -1,11 +1,11 @@
 #!/bin/bash
-# Launch a spot GPU instance, run Forge's full test on it, and tear everything down.
+# Launch a spot GPU instance, run Ookami's full test on it, and tear everything down.
 #   deploy/aws-gpu/aws.sh up | test | down | status
-# Everything it creates is tagged project=forge-test and named forge-test.
+# Everything it creates is tagged project=ookami-test and named ookami-test.
 set -euo pipefail
 REGION=${REGION:-us-east-1}
 TYPE=${TYPE:-g5.xlarge}
-NAME=forge-test
+NAME=ookami-test
 AWS=${AWS:-aws}
 KEY=~/.ssh/$NAME.pem
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -24,7 +24,7 @@ up() {
   sg=$(a ec2 describe-security-groups --filters Name=group-name,Values=$NAME Name=vpc-id,Values=$vpc \
        --query 'SecurityGroups[0].GroupId' --output text)
   if [ "$sg" = "None" ]; then
-    sg=$(a ec2 create-security-group --group-name $NAME --description "forge test: ssh from one IP" --vpc-id "$vpc" \
+    sg=$(a ec2 create-security-group --group-name $NAME --description "ookami test: ssh from one IP" --vpc-id "$vpc" \
          --tag-specifications "ResourceType=security-group,Tags=[{Key=project,Value=$NAME}]" --query GroupId --output text)
   fi
   ip=$(curl -s https://checkip.amazonaws.com)
@@ -49,7 +49,7 @@ test_() {
   (cd "$ROOT" && rm -rf dist && uv build --wheel -q)
   ssh -i "$KEY" ubuntu@"$IP" 'mkdir -p ~/kit ~/wheel && rm -f ~/wheel/*'
   scp -q -i "$KEY" "$ROOT"/dist/*.whl ubuntu@"$IP":~/wheel/
-  scp -q -i "$KEY" "$HERE"/forge.yaml "$HERE"/make_data.py "$HERE"/test.sh ubuntu@"$IP":~/kit/
+  scp -q -i "$KEY" "$HERE"/ookami.yaml "$HERE"/make_data.py "$HERE"/test.sh ubuntu@"$IP":~/kit/
   ssh -i "$KEY" ubuntu@"$IP" 'sudo docker run --rm --gpus all --ipc=host --entrypoint bash \
       -v ~/kit:/kit -v ~/wheel:/wheel -v ~/hf:/root/.cache/huggingface vllm/vllm-openai:latest /kit/test.sh' \
       2>&1 | tee "$HERE/last-run.log"

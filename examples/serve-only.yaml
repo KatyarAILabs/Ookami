@@ -1,15 +1,15 @@
 # Smallest useful install: one GPU box serving an open model behind a gateway. No training.
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Platform
 metadata: { name: my-box }
 spec:
-  storage: { uri: ./.forge }
+  storage: { uri: ./.ookami }
   components:
     training: { enabled: false }
     eval:     { enabled: false }
     registry: { enabled: false }
 ---
-apiVersion: forge.dev/v1alpha1
+apiVersion: ookami.dev/v1alpha1
 kind: Model
 metadata: { name: gpt-oss }
 spec:

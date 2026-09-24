@@ -26,7 +26,7 @@
   6. cost attribution across API and self-hosted models;
   7. the closed improvement loop (traces → fine-tune → eval gate → promote), which **nobody** ships open-source.
 
-  Forge has #1 partly and #7 largely. The rest is the roadmap below.
+  Ookami has #1 partly and #7 largely. The rest is the roadmap below.
 
 ## 1. What teams need
 
@@ -98,21 +98,21 @@ Sources: [comparison research, Sep 2026](#sources).
 
 Users are wary of licence changes and roadmap capture. A foundation-neutral, Apache-2.0 project is itself an advantage.
 
-## 3. Best open-source component per layer (what Forge bundles)
+## 3. Best open-source component per layer (what Ookami bundles)
 
 | Layer | Default | Alternative | Licence | Notes |
 |---|---|---|---|---|
 | Serving | vLLM (+ LMCache), llama.cpp (CPU/edge), MLX (Mac) | SGLang (agent prefix reuse), Dynamo (large NVIDIA fleets) | Apache/MIT | vLLM v0.30, Sep 2026. **TGI is archived** (Dec 2025) |
 | Serving on K8s | llm-d | KServe | Apache-2.0 | CNCF Sandbox; KV-aware routing, P/D, scale-to-zero |
-| Gateway | LiteLLM (MIT part only, pinned) | Bifrost (Go), Agent Router (ex-Envoy AI Gateway) | MIT/Apache | **LiteLLM 1.82.7/1.82.8 were backdoored on PyPI (Mar 2026)**: Forge requires ≥1.83. SSO/RBAC/audit are in LiteLLM's paid `enterprise/`, so Forge builds its own. **TensorZero is archived** |
+| Gateway | LiteLLM (MIT part only, pinned) | Bifrost (Go), Agent Router (ex-Envoy AI Gateway) | MIT/Apache | **LiteLLM 1.82.7/1.82.8 were backdoored on PyPI (Mar 2026)**: Ookami requires ≥1.83. SSO/RBAC/audit are in LiteLLM's paid `enterprise/`, so Ookami builds its own. **TensorZero is archived** |
 | Semantic routing | vLLM Semantic Router | - | Apache-2.0 | Optional |
 | Traces | Trajectory + OTel GenAI | OpenLLMetry | Apache-2.0 | OTel GenAI semconv is still "Development" but stable in shape since 1.37 |
 | Trace/eval UI | Langfuse (MIT core, no `ee/`) | Opik | MIT/Apache | **Exclude Arize Phoenix (ELv2)** |
-| Eval evaluators | Forge gate + Inspect + lm-eval-harness | DeepEval | MIT/Apache | promptfoo is now owned by OpenAI |
+| Eval evaluators | Ookami gate + Inspect + lm-eval-harness | DeepEval | MIT/Apache | promptfoo is now owned by OpenAI |
 | Training | TRL (1.x) / PEFT, mlx-lm | Axolotl, Unsloth core | Apache/MIT | **Never Unsloth Studio (AGPL)**. **torchtune is discontinued** |
 | RL | verl | SkyRL, ART (fit the Trajectory lake) | Apache-2.0 | |
 | Scheduling | Kueue + KEDA + GPU Operator + DRA (K8s ≥1.34) | KAI Scheduler, HAMi (fractional GPU) | Apache-2.0 | Karpenter is cloud-only |
-| Registry / artefacts | Forge registry + ModelPack OCI (KitOps) | MLflow 3 | Apache-2.0 | KServe and Harbor pull OCI models natively |
+| Registry / artefacts | Ookami registry + ModelPack OCI (KitOps) | MLflow 3 | Apache-2.0 | KServe and Harbor pull OCI models natively |
 | Vector (integration only) | pgvector | LanceDB, Qdrant | PostgreSQL/Apache | **Avoid Weaviate**: a proprietary `wl/` directory appeared in Aug 2026 |
 | Agent sandboxes | k8s agent-sandbox + gVisor | Kata; E2B self-host (needs Nomad) | Apache-2.0 | |
 | MCP gateway | IBM ContextForge | Agent Router MCPRoute | Apache-2.0 | |
@@ -140,11 +140,11 @@ Users are wary of licence changes and roadmap capture. A foundation-neutral, Apa
 | Many loosely integrated components lose to tools that are each easy | Kubeflow complaints [U] |
 | Publish reliability benchmarks | LiteLLM production complaints about cold starts, leaks and p99 [U]; Future AGI publishes gateway numbers |
 
-## 5. Where Forge stands
+## 5. Where Ookami stands
 
-| Requirement | Forge today |
+| Requirement | Ookami today |
 |---|---|
-| First call in ~5 min on one box | **Partly.** `forge up` works; install still means uv, extras and an engine |
+| First call in ~5 min on one box | **Partly.** `ookami up` works; install still means uv, extras and an engine |
 | Same config to K8s / air-gap | **No.** Local backend only; K8s kits are pods, not a backend |
 | Auth, keys, budgets, rate limits by default | **No.** The managed gateway runs without a master key (bound to localhost) |
 | SSO / RBAC / multi-tenancy, free | **No** |
@@ -161,7 +161,7 @@ Users are wary of licence changes and roadmap capture. A foundation-neutral, Apa
 
 **Positioning:** *the open, vendor-neutral AI infrastructure layer. It serves any model on any hardware behind one secure gateway, and it's the only one that turns your traffic into better models you own.* Lead with the loop, and win adoption with the first five minutes.
 
-**Main risk: NeMo Helix.** It ships monthly under Apache-2.0 with NVIDIA's reach. Forge's answer is to be:
+**Main risk: NeMo Helix.** It ships monthly under Apache-2.0 with NVIDIA's reach. Ookami's answer is to be:
 - hardware-neutral;
 - single-box-first;
 - stable before Helix reaches 1.0;

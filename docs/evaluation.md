@@ -1,6 +1,6 @@
 # Evaluation and the gate
 
-**Forge supplies the statistics and the gate. You supply the judgement.** Forge never claims a model is correct. It reports whether the candidate met *your* evaluators, with confidence bounds.
+**Ookami supplies the statistics and the gate. You supply the judgement.** Ookami never claims a model is correct. It reports whether the candidate met *your* evaluators, with confidence bounds.
 
 ## How the gate decides
 
@@ -27,10 +27,10 @@ flowchart TB
 | `webhook` | `- webhook: { url: http://checker/score }` | row | Your service: POST `{example, output}` → `{value, passed?, reason?}` |
 | `command` | `- command: { run: "python bench.py --base-url {base_url} --model {model} --out {output}" }` | rollout | Any harness that writes JSONL `{"item_id", "score", "passed"?, "slice"?, "error"?}` |
 | `plugin` | `- plugin: { use: acme.check, ...params }` | either | An installed package (see [plugins](plugins.md)) |
-| `forge/structural` | `- forge/structural` | row | **Shape only:** tool name exists, tool arguments match the schema, JSON output parses and matches `json_schema`. Labelled as such in reports |
+| `ookami/structural` | `- ookami/structural` | row | **Shape only:** tool name exists, tool arguments match the schema, JSON output parses and matches `json_schema`. Labelled as such in reports |
 | `lm-eval`, `inspect` | in the schema | rollout | Planned |
 
-- **Row evaluators:** Forge produces the outputs itself, by calling the target with each held-out row (`eval.generation` sets max tokens and temperature), or by reading recorded outputs.
+- **Row evaluators:** Ookami produces the outputs itself, by calling the target with each held-out row (`eval.generation` sets max tokens and temperature), or by reading recorded outputs.
 - **Rollout evaluators:** these drive the model themselves and define their own items. Several attempts per item (trials) are averaged.
 - **Non-gating evaluators:** an evaluator with `gate: false` is reported but doesn't block promotion.
 
@@ -78,7 +78,7 @@ After training, only `pass` sets a version to `passed`.
 
 ## Guardrails
 
-**Warnings from `forge validate`:**
+**Warnings from `ookami validate`:**
 - The RL reward is also a gate evaluator. RL learns to exploit the reward's blind spots, and a gate using the same function can't see them.
 - RL with `audit: 0`.
 - The gate uses structural checks only.

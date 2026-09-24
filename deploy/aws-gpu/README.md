@@ -1,6 +1,6 @@
-# Forge on an AWS spot GPU
+# Ookami on an AWS spot GPU
 
-Runs the whole of Forge on one NVIDIA GPU:
+Runs the whole of Ookami on one NVIDIA GPU:
 - validate the config;
 - serve with vLLM behind LiteLLM;
 - fine-tune with TRL (LoRA);

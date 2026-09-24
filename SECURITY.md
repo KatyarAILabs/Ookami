@@ -9,7 +9,7 @@ Please don't open public issues for vulnerabilities. Report them privately throu
 | Area | Behaviour |
 |---|---|
 | Network | Engines and the managed gateway bind to `127.0.0.1` by default. Engines never need to be reachable from outside: clients go through the gateway |
-| Adapter loading | vLLM's runtime adapter loading is for trusted networks only. Only Forge's controller should be able to reach engine ports |
-| Secrets | `forge.yaml` only holds references (`${secret:name}`). Inline credentials are rejected by validation |
-| Evaluators | `python`, `command` and `plugin` evaluators run your code with your permissions. Treat `forge.yaml` like code |
-| Data | Stays in your storage. Forge sends no telemetry |
+| Adapter loading | vLLM's runtime adapter loading is for trusted networks only. Only Ookami's controller should be able to reach engine ports |
+| Secrets | `ookami.yaml` only holds references (`${secret:name}`). Inline credentials are rejected by validation |
+| Evaluators | `python`, `command` and `plugin` evaluators run your code with your permissions. Treat `ookami.yaml` like code |
+| Data | Stays in your storage. Ookami sends no telemetry |

@@ -24,7 +24,7 @@
       "Effect": "Allow",
       "Action": ["ec2:RunInstances", "ec2:CreateTags"],
       "Resource": "*",
-      "Condition": {"StringEquals": {"aws:RequestTag/project": "forge-test"}}
+      "Condition": {"StringEquals": {"aws:RequestTag/project": "ookami-test"}}
     },
     {
       "Sid": "LaunchSupportingResources",
@@ -45,7 +45,7 @@
       "Effect": "Allow",
       "Action": ["ec2:TerminateInstances", "ec2:StopInstances", "ec2:StartInstances"],
       "Resource": "*",
-      "Condition": {"StringEquals": {"aws:ResourceTag/project": "forge-test"}}
+      "Condition": {"StringEquals": {"aws:ResourceTag/project": "ookami-test"}}
     },
     {
       "Sid": "KitKeyPairAndSecurityGroup",
