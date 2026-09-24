@@ -9,6 +9,7 @@ from __future__ import annotations
 import platform
 import shlex
 import shutil
+from pathlib import Path
 from dataclasses import dataclass
 
 from ..catalog import CATALOG
@@ -90,10 +91,15 @@ def launch(doc: ModelDoc, port: int, adapter: str | None = None,
         else:
             argv += ["--served-model-name", name]
         return EngineLaunch(engine, weights, name, [*argv, *s.args])
-    argv = [_bin("mlx_lm.server", "mlx"), "--model", weights, "--host", s.host, "--port", str(port)]
-    if adapter:
-        argv += ["--adapter-path", adapter]
-    return EngineLaunch(engine, weights, weights, [*argv, *s.args])
+    # mlx: serve the fused model a trained version produced (see train.backends.post_train).
+    # Clients send "default_model", which mlx-lm maps to whatever --model it was started with, so the
+    # gateway config stays the same when a new version goes live.
+    fused = Path(adapter) / "fused" if adapter else None
+    if adapter and not (fused and fused.exists()):
+        raise EngineError(f"Model/{name}: {adapter} has no fused model; retrain with this version of forge")
+    argv = [_bin("mlx_lm.server", "mlx"), "--model", str(fused) if fused else weights,
+            "--host", s.host, "--port", str(port)]
+    return EngineLaunch(engine, str(fused) if fused else weights, "default_model", [*argv, *s.args])
 
 
 def _bin(exe: str, engine: str) -> str:

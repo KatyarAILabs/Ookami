@@ -38,7 +38,9 @@ def test_engine_commands(write, monkeypatch):
     assert "--served-model-name" in v.argv and v.argv[-2:] == ["--max-model-len", "8192"] and v.model_id == "m"
     cfg = doc(write, "  base: qwen3-4b-instruct-2507\n  serve: { engine: mlx }")
     m = launch(cfg.models["m"], 8101)
-    assert m.weights == "mlx-community/Qwen3-4B-Instruct-2507-4bit" and m.model_id == m.weights
+    assert m.weights == "mlx-community/Qwen3-4B-Instruct-2507-4bit" and m.model_id == "default_model"
+    with pytest.raises(EngineError, match="no fused model"):
+        launch(cfg.models["m"], 8101, adapter="/nonexistent")
     cfg = doc(write, "  base: my/model\n  licence: MIT\n  weights: ./w\n"
                      "  serve: { engine: command, command: 'srv --w {weights} --p {port}', modelId: x }")
     c = launch(cfg.models["m"], 9000)

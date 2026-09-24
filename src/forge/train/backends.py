@@ -69,3 +69,24 @@ def argv_for(engine: str, job_dir: Path, command: str | None = None) -> list[str
             raise TrainerError("train.engine command needs train.command")
         return shlex.split(command.format(job=job_dir / "job.json"))
     raise TrainerError(f"unknown trainer {engine!r}")
+
+
+def post_train(engine: str, job: dict, log_path: Path) -> None:
+    """Make the trained adapter servable.
+
+    mlx: fuse the adapter into a standalone model directory (adapter_dir/fused). mlx-lm's server ignores
+    --adapter-path unless every request also names the adapter (seen with mlx-lm 0.31), so serving a
+    fused model is the reliable way to make the gateway reach the trained weights.
+    """
+    if engine != "mlx":
+        return
+    import subprocess
+    exe = shutil.which("mlx_lm.fuse")
+    if not exe:
+        raise TrainerError("mlx_lm.fuse not found on PATH: pip install mlx-lm")
+    adapter = Path(job["adapter_dir"])
+    argv = [exe, "--model", job["weights"], "--adapter-path", str(adapter), "--save-path", str(adapter / "fused")]
+    with open(log_path, "ab") as out:
+        code = subprocess.run(argv, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode
+    if code != 0:
+        raise TrainerError(f"mlx_lm.fuse exited {code}")

@@ -24,7 +24,7 @@ from ..config import Config, load
 from ..interfaces import JobSpec, JobState, JobStatus
 from ..local import runtime
 from ..registry import open_registry
-from .backends import argv_for
+from .backends import argv_for, post_train
 from .gate import adapter_ready, gate_version
 
 TERMINAL = {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED}
@@ -176,6 +176,8 @@ def run_job(cfg: Config, runner: LocalJobRunner, job_id: str) -> None:
             runner._write(JobStatus(job_id, JobState.FAILED, finished_at=time.time(), message=why))
             reg.update(model, version, status="failed")
             return
+        runner._write(JobStatus(job_id, JobState.RUNNING, message="packaging the adapter for serving"))
+        post_train(job["trainer"], job, d / "train.log")
         runner._write(JobStatus(job_id, JobState.RUNNING, message="gating: candidate vs incumbent"))
         report = gate_version(cfg, reg, reg.get(model, version))
         runner._write(JobStatus(job_id, JobState.SUCCEEDED, finished_at=time.time(),
