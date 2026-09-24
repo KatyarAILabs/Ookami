@@ -160,9 +160,18 @@ def test_route_needs_a_gateway(write):
     assert any("needs a gateway" in e for e in errors(load(write("f.yaml", text))))
 
 
-def test_traces_source_needs_tracing(write):
-    cfg = load(write("f.yaml", model_doc(EVAL, data="{ traces: gateway }")))
-    assert any("components.tracing" in e for e in errors(cfg))
+def test_traces_source_needs_a_lake(write):
+    cfg = load(write("f.yaml", model_doc(EVAL, data="{ traces: { minReward: 1 } }")))
+    assert any("needs a lake" in e for e in errors(cfg))
+    assert load(write("g.yaml", model_doc(EVAL, data="{ traces: { lake: ./lake } }"))).ok
+
+
+def test_tracing_component_needs_collector(write):
+    on = PLATFORM + "  components: { tracing: { enabled: true } }\n"
+    assert any("Platform.tracing" in e for e in errors(load(write("a.yaml", on))))
+    managed = on + "  tracing: { lake: ./lake, config: ./missing.yaml }\n"
+    assert any("tracing.config not found" in e for e in errors(load(write("b.yaml", managed))))
+    assert any("tracing.config" in e for e in errors(load(write("c.yaml", on + "  tracing: { lake: ./lake }\n"))))
 
 
 def test_external_gateway_needs_url(write):

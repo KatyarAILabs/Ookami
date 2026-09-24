@@ -12,8 +12,12 @@ spec:
     url: http://litellm.internal:4000
     adminKey: "${secret:litellm-admin}"
   components:
-    tracing: { enabled: true }          # capture gateway traffic into the bucket
+    tracing: { enabled: true }          # capture gateway traffic with Trajectory
     console: { enabled: true }
+  tracing:
+    mode: external                      # a Trajectory collector you already run
+    lake: s3://acme-traces/lake
+    webhook: https://trajectory.internal:4320/v1/hooks/litellm
   compute:
     profile: cloud-eks
     training: { gpu: H100-80GB, count: 1, capacity: [spot, on-demand], budgetHoursPerWeek: 20 }
@@ -25,7 +29,7 @@ metadata: { name: support-4b }
 spec:
   base: qwen3.5-4b
   data:
-    source: { traces: gateway, match: { route: /support/agent } }
+    source: { traces: { minReward: 1 } }   # episodes Trajectory scored as successful
     minExamples: 500
   train:
     recipe: sft-then-grpo

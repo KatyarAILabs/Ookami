@@ -15,6 +15,7 @@ A `forge.yaml` holds YAML documents, each with `apiVersion: forge.dev/v1alpha1`,
 | `database` | [Database](#database) | see below | State database. SQLite in storage for the local backend; Postgres on k8s. |
 | `gateway` | [Gateway](#gateway) | see below | The OpenAI-compatible gateway in front of every model. |
 | `components` | [Components](#components) | see below | Switch on what you need. Each component also works on its own. |
+| `tracing` | [Tracing](#tracing) (optional) | - | Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collector, its lake, and the gateway hook. |
 | `compute` | [Compute](#compute) | see below | What compute to use and where it comes from. |
 | `telemetry` | `off` \| `on` | `off` | opt-in usage telemetry (none is sent today) |
 
@@ -57,7 +58,7 @@ Switch on what you need. Each component also works on its own.
 | `training` | [Component](#component) | see below | fine-tuning queue and trainers; on by default |
 | `eval` | [Component](#component) | see below | held-out sets, the promotion gate, reports; on by default |
 | `registry` | [Component](#component) | see below | versions, gate decisions, promotions; on by default |
-| `tracing` | [Component](#component) | see below | capture gateway traffic into storage (planned); off by default |
+| `tracing` | [Component](#component) | see below | capture gateway traffic with Trajectory (set Platform.tracing); off by default |
 | `console` | [Component](#component) | see below | web UI (planned); off by default |
 
 ### Component
@@ -67,6 +68,20 @@ Turn a component on or off.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `enabled` | bool | `True` | run this component |
+
+### Tracing
+
+Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collector, its lake, and the gateway hook.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `mode` | `managed` \| `external` | `managed` | managed: forge up runs the collector; external: a collector you run elsewhere |
+| `config` | str (optional) | - | managed: your Trajectory collector config (redaction policy is yours) |
+| `lake` | str | **required** | the lake directory the collector writes; traces data sources export from it |
+| `webhook` | str | `http://127.0.0.1:4320/v1/hooks/litellm` | collector endpoint the managed gateway sends LiteLLM callbacks to |
+| `tokenEnv` | str (optional) | - | env var holding the bearer token the collector's webhook expects |
+| `healthUrl` | str | `http://127.0.0.1:9464/healthz` | collector liveness URL (its telemetry listener) |
+| `bin` | str | `cc` | the Trajectory CLI |
 
 ### Compute
 
@@ -145,8 +160,21 @@ Where a Model's data comes from. Set exactly one of jsonl, parquet, hf, traces.
 | `jsonl` | str (optional) | - | path to a JSONL file: rows with messages, input or prompt; optional label |
 | `parquet` | str (optional) | - | path to a Parquet file or directory (needs forge-ml[parquet]) |
 | `hf` | str (optional) | - | Hugging Face dataset id |
-| `traces` | `gateway` (optional) | - | traffic captured by the tracing component |
+| `traces` | [TracesSource](#tracessource) (optional) | - | traffic captured by Trajectory |
 | `match` | map | `{}` | filter for traces sources, e.g. {route: /support} |
+
+### TracesSource
+
+Training data exported from a Trajectory lake with `cc export -format chat`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `lake` | str (optional) | - | default: Platform.tracing.lake |
+| `minReward` | float (optional) | - | keep only episodes scored at or above this |
+| `requireReward` | bool | `False` | keep only episodes a scorer has rewarded |
+| `requireFinal` | bool | `False` | keep only episodes whose outcome labels are final |
+| `verifier` | str (optional) | - | whose rewards to use, if the lake has several |
+| `asOf` | str (optional) | - | RFC 3339 time; fix it to rebuild a dataset exactly |
 
 ### Train
 

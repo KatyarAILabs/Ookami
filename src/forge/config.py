@@ -97,6 +97,25 @@ class Gateway(Strict):
         return self
 
 
+class Tracing(Strict):
+    """Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collector, its lake, and the gateway hook."""
+    mode: Literal["managed", "external"] = Field(
+        "managed", description="managed: forge up runs the collector; external: a collector you run elsewhere")
+    config: str | None = Field(None, description="managed: your Trajectory collector config (redaction policy is yours)")
+    lake: str = Field(description="the lake directory the collector writes; traces data sources export from it")
+    webhook: str = Field("http://127.0.0.1:4320/v1/hooks/litellm",
+                         description="collector endpoint the managed gateway sends LiteLLM callbacks to")
+    tokenEnv: str | None = Field(None, description="env var holding the bearer token the collector's webhook expects")
+    healthUrl: str = Field("http://127.0.0.1:9464/healthz", description="collector liveness URL (its telemetry listener)")
+    bin: str = Field("cc", description="the Trajectory CLI")
+
+    @model_validator(mode="after")
+    def _config_needed(self) -> "Tracing":
+        if self.mode == "managed" and not self.config:
+            raise ValueError("managed tracing needs tracing.config: the Trajectory collector config to run")
+        return self
+
+
 class Component(Strict):
     """Turn a component on or off."""
     enabled: bool = Field(True, description="run this component")
@@ -108,7 +127,7 @@ class Components(Strict):
     training: Component = Field(Component(), description="fine-tuning queue and trainers; on by default")
     eval: Component = Field(Component(), description="held-out sets, the promotion gate, reports; on by default")
     registry: Component = Field(Component(), description="versions, gate decisions, promotions; on by default")
-    tracing: Component = Field(Component(enabled=False), description="capture gateway traffic into storage (planned); off by default")
+    tracing: Component = Field(Component(enabled=False), description="capture gateway traffic with Trajectory (set Platform.tracing); off by default")
     console: Component = Field(Component(enabled=False), description="web UI (planned); off by default")
 
 
@@ -141,6 +160,7 @@ class PlatformSpec(Strict):
     database: Database = Database()
     gateway: Gateway = Gateway()
     components: Components = Components()
+    tracing: Tracing | None = None
     compute: Compute = Compute()
     telemetry: Literal["off", "on"] = Field("off", description="opt-in usage telemetry (none is sent today)")
 
@@ -158,12 +178,22 @@ class PlatformSpec(Strict):
 
 # ---------------------------------------------------------------- Model
 
+class TracesSource(Strict):
+    """Training data exported from a Trajectory lake with `cc export -format chat`."""
+    lake: str | None = Field(None, description="default: Platform.tracing.lake")
+    minReward: float | None = Field(None, description="keep only episodes scored at or above this")
+    requireReward: bool = Field(False, description="keep only episodes a scorer has rewarded")
+    requireFinal: bool = Field(False, description="keep only episodes whose outcome labels are final")
+    verifier: str | None = Field(None, description="whose rewards to use, if the lake has several")
+    asOf: str | None = Field(None, description="RFC 3339 time; fix it to rebuild a dataset exactly")
+
+
 class DataSource(Strict):
     """Where a Model's data comes from. Set exactly one of jsonl, parquet, hf, traces."""
     jsonl: str | None = Field(None, description="path to a JSONL file: rows with messages, input or prompt; optional label")
     parquet: str | None = Field(None, description="path to a Parquet file or directory (needs forge-ml[parquet])")
     hf: str | None = Field(None, description="Hugging Face dataset id")
-    traces: Literal["gateway"] | None = Field(None, description="traffic captured by the tracing component")
+    traces: TracesSource | None = Field(None, description="traffic captured by Trajectory")
     match: dict[str, str] = Field({}, description="filter for traces sources, e.g. {route: /support}")
 
     @model_validator(mode="after")
@@ -483,6 +513,15 @@ def lint(cfg: Config) -> list[Issue]:
     if cfg.platform is None:
         out.append(Issue("warning", cfg.path.name, "no Platform document; commands that need storage or a gateway will fail"))
     plat = cfg.platform.spec if cfg.platform else None
+    if plat and plat.components.tracing.enabled:
+        where = f"Platform/{cfg.platform.metadata.name}"
+        if not plat.tracing:
+            out.append(Issue("error", where, "components.tracing needs Platform.tracing (the Trajectory collector)"))
+        elif plat.tracing.mode == "managed" and not cfg.resolve(plat.tracing.config).exists():
+            out.append(Issue("error", where, f"tracing.config not found: {plat.tracing.config}"))
+        elif plat.gateway.mode == "external":
+            out.append(Issue("warning", where, "tracing with an external gateway: point its LiteLLM generic_api "
+                                               f"callback at {plat.tracing.webhook} yourself"))
     for name, m in cfg.models.items():
         where = f"Model/{name}"
         spec = m.spec
@@ -495,8 +534,9 @@ def lint(cfg: Config) -> list[Issue]:
                     out.append(Issue("error", where, f"needs the {comp} component; enable components.{comp}"))
             if spec.handoff.route and plat.gateway.mode == "none":
                 out.append(Issue("error", where, "handoff.route needs a gateway (gateway.mode managed or external)"))
-            if spec.data and spec.data.source.traces and not c.tracing.enabled:
-                out.append(Issue("error", where, "data.source.traces needs components.tracing"))
+            tr = spec.data.source.traces if spec.data else None
+            if tr is not None and not tr.lake and not plat.tracing:
+                out.append(Issue("error", where, "data.source.traces needs a lake: set it, or Platform.tracing"))
         for p in [spec.data.source.jsonl, spec.data.source.parquet] if spec.data else []:
             if p and "://" not in p and not cfg.resolve(p).exists():
                 out.append(Issue("warning", where, f"data source not found yet: {p}"))

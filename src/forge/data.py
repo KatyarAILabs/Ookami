@@ -14,7 +14,7 @@ from typing import Any
 
 from dataclasses import dataclass
 
-from .config import Config, DataSource, Splits
+from .config import Config, DataSource, Splits, TracesSource
 from .evaluators.base import Example, Target, post_json
 
 
@@ -65,7 +65,47 @@ def load_source(src: DataSource, cfg: Config) -> tuple[list[Example], str]:
         name, _, split = src.hf.partition(":")
         rows = list(datasets.load_dataset(name, split=split or "train"))
         return [to_example(r, f"{src.hf}:{i}") for i, r in enumerate(rows)], _rows_hash(rows)
-    raise NotImplementedError("traces sources arrive with the tracing component (0.3)")
+    if src.traces:
+        path = export_traces(src.traces, cfg)
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        out = []
+        for i, r in enumerate(rows):
+            meta = r.pop("metadata", None) or {}
+            r.setdefault("id", f"{meta.get('episode_id', 'ep')}:{meta.get('step_idx', i)}")
+            out.append(to_example({**meta, **r}, f"{path}:{i}"))
+        return out, dataset_hash(path)
+    raise ValueError("data.source has no source set")
+
+
+def export_traces(src: "TracesSource", cfg: Config) -> Path:
+    """Run Trajectory's `cc export -format chat` against the lake; returns the JSONL it wrote."""
+    import subprocess
+    import tempfile
+    tr = cfg.platform.spec.tracing if cfg.platform else None
+    lake = src.lake or (tr.lake if tr else None)
+    if not lake:
+        raise ValueError("traces source needs a lake: set data.source.traces.lake or Platform.tracing.lake")
+    exe = tr.bin if tr else "cc"
+    out = Path(tempfile.mkdtemp(prefix="forge-traces-")) / "chat.jsonl"
+    argv = [exe, "export", "-lake", str(cfg.resolve(lake)), "-format", "chat", "-out", str(out),
+            f"-require-final={'true' if src.requireFinal else 'false'}"]
+    if src.requireReward:
+        argv.append("-require-reward")
+    if src.minReward is not None:
+        argv += ["-min-reward", str(src.minReward)]
+    if src.verifier:
+        argv += ["-verifier", src.verifier]
+    if src.asOf:
+        argv += ["-as-of", src.asOf]
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Trajectory CLI {exe!r} not found; install Trajectory or set Platform.tracing.bin") from None
+    if r.returncode != 0:
+        raise RuntimeError(f"cc export failed ({r.returncode}): {(r.stderr or r.stdout).strip()[-800:]}")
+    if not out.exists():
+        out.write_text("")
+    return out
 
 
 def _rows_hash(rows: list[dict]) -> str:

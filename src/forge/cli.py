@@ -59,6 +59,8 @@ def cmd_up(args: argparse.Namespace) -> int:
     gw = next((s for s in services if s.kind == "gateway"), None)
     print()
     for s in services:
+        if s.kind == "tracing":
+            print(f"{'tracing':24} Trajectory collector <- gateway callbacks ({s.url})")
         if s.kind == "engine":
             via = f"{gw.url}  model={s.name}" if gw else f"{s.url}  model={s.model_id}"
             print(f"{s.name:24} {via}")

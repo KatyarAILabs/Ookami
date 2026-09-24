@@ -166,13 +166,28 @@ def wait_ready(svc: Service, timeout: float) -> None:
 
 # ---------------------------------------------------------------- up / down / status
 
-def gateway_config(engines: list[Service]) -> dict:
+def gateway_config(engines: list[Service], tracing: bool = False) -> dict:
+    settings: dict = {"drop_params": True}
+    if tracing:
+        settings["callbacks"] = ["generic_api"]   # LiteLLM -> Trajectory webhook, one callback per completion
     return {
         "model_list": [{"model_name": s.name,
                         "litellm_params": {"model": f"openai/{s.model_id}", "api_base": s.url, "api_key": "none"}}
                        for s in engines],
-        "litellm_settings": {"drop_params": True},
+        "litellm_settings": settings,
     }
+
+
+def tracing_env(plat) -> dict[str, str]:
+    """Environment that points LiteLLM's generic_api callback at the Trajectory collector."""
+    tr = plat.tracing
+    env = {"GENERIC_LOGGER_ENDPOINT": tr.webhook}
+    if tr.tokenEnv:
+        token = os.environ.get(tr.tokenEnv)
+        if not token:
+            raise UpError(f"tracing.tokenEnv {tr.tokenEnv} is not set in the environment")
+        env["GENERIC_LOGGER_HEADERS"] = f"Authorization=Bearer {token}"
+    return env
 
 
 def litellm_bin() -> str | None:
@@ -197,7 +212,20 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
 
     logs = storage_dir(cfg) / "logs"
     services: list[Service] = []
+    tracing = plat.components.tracing.enabled and plat.tracing is not None
     try:
+        if tracing and plat.tracing.mode == "managed":
+            tr = plat.tracing
+            exe = shutil.which(tr.bin) or (str(cfg.resolve(tr.bin)) if cfg.resolve(tr.bin).exists() else None)
+            if not exe:
+                raise UpError(f"Trajectory CLI {tr.bin!r} not found; install Trajectory or set tracing.bin")
+            argv = [exe, "run", "-config", str(cfg.resolve(tr.config))]
+            svc = Service("tracing", "tracing", start(argv, logs / "tracing.log"), 0, tr.webhook, tr.healthUrl,
+                          str(logs / "tracing.log"), argv)
+            services.append(svc)
+            write_state(cfg, services)
+            wait_ready(svc, min(timeout, 120.0))
+            log(f"ready    tracing: Trajectory collector, lake {tr.lake}")
         taken: set[int] = {plat.gateway.port}
         for name, doc in cfg.models.items():
             port = doc.spec.serve.port or pick_port(taken)
@@ -216,13 +244,15 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             version = f" + {live.tag}" if live else ""
             log(f"starting {name}: {spec.engine} {spec.weights}{version} on :{port}")
         for svc in services:
-            wait_ready(svc, timeout)
-            log(f"ready    {svc.name}: {svc.url}")
+            if svc.kind == "engine":
+                wait_ready(svc, timeout)
+                log(f"ready    {svc.name}: {svc.url}")
 
         gw = plat.gateway
         if gw.mode == "managed":
             conf = storage_dir(cfg) / "run" / "gateway.yaml"
-            conf.write_text(yaml.safe_dump(gateway_config(services), sort_keys=False))
+            engines = [s for s in services if s.kind == "engine"]
+            conf.write_text(yaml.safe_dump(gateway_config(engines, tracing), sort_keys=False))
             host = "127.0.0.1"
             if gw.command:
                 argv = shlex.split(gw.command.format(config=conf, port=gw.port, host=host))
@@ -233,7 +263,8 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
                 argv = [exe, "--config", str(conf), "--host", host, "--port", str(gw.port)]
             if not port_free(gw.port):
                 raise UpError(f"gateway port {gw.port} is busy; set gateway.port")
-            svc = Service("gateway", "gateway", start(argv, logs / "gateway.log"), gw.port,
+            env = tracing_env(plat) if tracing else None
+            svc = Service("gateway", "gateway", start(argv, logs / "gateway.log", env), gw.port,
                           f"http://{host}:{gw.port}/v1", f"http://{host}:{gw.port}/health/liveliness",
                           str(logs / "gateway.log"), argv)
             services.append(svc)
@@ -245,7 +276,8 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             log(f"ready    gateway: {svc.url}")
         elif gw.mode == "external":
             snippet = storage_dir(cfg) / "run" / "gateway-models.yaml"
-            snippet.write_text(yaml.safe_dump(gateway_config(services), sort_keys=False))
+            snippet.write_text(yaml.safe_dump(gateway_config([s for s in services if s.kind == "engine"], tracing),
+                                              sort_keys=False))
             log(f"external gateway: add the model_list in {snippet} to your gateway at {gw.url}")
     except BaseException:
         for s in reversed(services):
