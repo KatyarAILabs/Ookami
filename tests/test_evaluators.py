@@ -79,3 +79,23 @@ def test_command_runs_live_against_a_target(tmp_path):
     ev = CommandEvaluator("b", base_dir=tmp_path, run="python bench.py {output} {model}")
     obs, _ = ev.run(Target.parse("openai:http://x/v1#good", "candidate"))
     assert obs[0].score.value == 1.0
+
+
+def test_plugin_evaluator_via_entry_point(monkeypatch, tmp_path):
+    from forge import evaluators as evs
+    from forge.config import EvaluatorSpec
+
+    class EP:
+        name = "acme.check"
+
+        def load(self):
+            return lambda name, base_dir, threshold: LabelsEvaluator(name)
+
+    monkeypatch.setattr(evs, "entry_points", lambda group: [EP()])
+    spec = EvaluatorSpec.model_validate({"plugin": {"use": "acme.check", "threshold": 0.5}})
+    assert spec.name == "acme.check"
+    ev = evs.build(spec, tmp_path)
+    assert ev.name == "acme.check" and ev.score(Example("1", "q", label="a"), "a").passed
+    import pytest
+    with pytest.raises(ImportError, match="no evaluator plugin"):
+        evs.build(EvaluatorSpec.model_validate({"plugin": {"use": "missing"}}), tmp_path)

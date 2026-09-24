@@ -23,26 +23,14 @@ SECRET_RE = re.compile(r"^\$\{secret:([A-Za-z0-9_.-]+)\}$")
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 STAGE_RE = re.compile(r"^(shadow|live|canary:(\d{1,3})%)$")
 
-# Base models we allow without further paperwork: open weights, licence allows commercial use.
-BASE_MODELS: dict[str, str] = {
-    "qwen3.5-0.8b": "Apache-2.0",
-    "qwen3.5-2b": "Apache-2.0",
-    "qwen3.5-4b": "Apache-2.0",
-    "qwen3.5-9b": "Apache-2.0",
-    "qwen3-4b-instruct-2507": "Apache-2.0",
-    "gemma-4-e2b": "Apache-2.0",
-    "gemma-4-e4b": "Apache-2.0",
-    "gemma-4-12b": "Apache-2.0",
-    "gpt-oss-20b": "Apache-2.0",
-    "phi-4-mini": "MIT",
-    "smollm3-3b": "Apache-2.0",
-}
-ALLOWED_LICENCES = {"Apache-2.0", "MIT", "BSD-3-Clause", "BSD-2-Clause"}
+from .catalog import ALLOWED_LICENCES, CATALOG
+
+BASE_MODELS: dict[str, str] = {k: v.licence for k, v in CATALOG.items()}
 
 # Recipe fields a Model may override; everything else comes from the recipe and the memory planner.
 OVERRIDABLE = {"lora.rank", "lora.alpha", "epochs", "learning_rate", "max_seq_len", "batch_size", "seed"}
 
-EVALUATOR_KINDS = ("labels", "python", "webhook", "command", "lm-eval", "inspect", "structural")
+EVALUATOR_KINDS = ("labels", "python", "webhook", "command", "plugin", "lm-eval", "inspect", "structural")
 
 
 class Strict(BaseModel):
@@ -89,6 +77,9 @@ class Gateway(Strict):
     type: Literal["litellm", "agent-router"] = "litellm"
     url: str | None = None
     adminKey: str | None = None
+    port: int = Field(4000, ge=1, le=65535, description="managed gateway port")
+    command: str | None = Field(None, description="advanced: launch template for a managed gateway, "
+                                                  "with {config} {port} {host}")
 
     @field_validator("adminKey")
     @classmethod
@@ -240,12 +231,14 @@ class EvaluatorSpec(Strict):
             default = "inspect"
         else:
             params = dict(body or {})
-            default = f"labels:{params.get('column', 'label')}" if kind == "labels" else kind
+            default = {"labels": f"labels:{params.get('column', 'label')}",
+                       "plugin": str(params.get("use", "plugin"))}.get(kind, kind)
         return {"kind": kind, "params": params, "name": extra.pop("name", default), **extra}
 
     @model_validator(mode="after")
     def _params(self) -> "EvaluatorSpec":
-        need = {"python": "ref", "webhook": "url", "command": "run", "lm-eval": "tasks", "inspect": "task"}.get(self.kind)
+        need = {"python": "ref", "webhook": "url", "command": "run", "plugin": "use", "lm-eval": "tasks",
+                "inspect": "task"}.get(self.kind)
         if need and need not in self.params:
             raise ValueError(f"{self.kind} evaluator needs {need}")
         return self
@@ -321,9 +314,27 @@ class Handoff(Strict):
         return v
 
 
+class Serve(Strict):
+    engine: Literal["auto", "vllm", "mlx", "command"] = Field(
+        "auto", description="auto: vllm on NVIDIA GPUs, mlx on Apple silicon; command: any OpenAI-compatible server")
+    command: str | None = Field(None, description="engine command: launch template with {weights} {port} {host} {name}")
+    modelId: str | None = Field(None, description="engine command: the model id the server expects in requests")
+    port: int | None = Field(None, ge=1, le=65535)
+    host: str = "127.0.0.1"
+    args: list[str] = Field([], description="extra engine flags, e.g. [--max-model-len, '8192']")
+
+    @model_validator(mode="after")
+    def _command(self) -> "Serve":
+        if self.engine == "command" and not self.command:
+            raise ValueError("engine command needs serve.command")
+        return self
+
+
 class ModelSpec(Strict):
-    base: str = Field(description="catalog name or Hugging Face id of the open-weight base model")
+    base: str = Field(description="catalog name, or any name when weights and licence are set")
     licence: str | None = Field(None, description="required when base is not in forge's catalog")
+    weights: str | None = Field(None, description="Hugging Face id or local path; defaults to the catalog's")
+    serve: Serve = Serve()
     data: Data | None = None
     train: Train | None = None
     eval: Eval | None = None
