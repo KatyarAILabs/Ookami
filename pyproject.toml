@@ -1,6 +1,6 @@
 [project]
 name = "forge-ml"
-version = "0.0.1"
+version = "0.2.0.dev0"
 description = "Packaged, self-hosted AI infrastructure: traffic in, gated fine-tuned models out."
 readme = "README.md"
 requires-python = ">=3.10"
