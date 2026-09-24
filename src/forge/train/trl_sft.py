@@ -29,17 +29,20 @@ def main(job_path: str) -> None:
     ds = load_dataset("json", data_files={"train": str(data_dir / "train.jsonl"),
                                           "validation": str(data_dir / "valid.jsonl")})
 
+    # bf16 where the GPU has it (Ampere and newer); fp16 on older cards such as the T4
+    bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    dtype = torch.bfloat16 if bf16 else torch.float16
     quant = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True,
-                               bnb_4bit_compute_dtype=torch.bfloat16) if p["quantize"] else None
+                               bnb_4bit_compute_dtype=dtype) if p["quantize"] else None
     tok = AutoTokenizer.from_pretrained(job["weights"])
-    model = AutoModelForCausalLM.from_pretrained(job["weights"], torch_dtype=torch.bfloat16,
+    model = AutoModelForCausalLM.from_pretrained(job["weights"], torch_dtype=dtype,
                                                  quantization_config=quant, device_map="auto")
     lora = LoraConfig(r=p["rank"], lora_alpha=p["alpha"], lora_dropout=p["dropout"],
                       target_modules="all-linear", task_type="CAUSAL_LM")
     args = SFTConfig(
         output_dir=str(ckpt_dir), max_steps=p["iters"], per_device_train_batch_size=p["batch_size"],
         gradient_accumulation_steps=p["grad_accumulation"], learning_rate=p["learning_rate"],
-        gradient_checkpointing=p["grad_checkpoint"], bf16=True, logging_steps=10,
+        gradient_checkpointing=p["grad_checkpoint"], bf16=bf16, fp16=not bf16, logging_steps=10,
         save_steps=max(10, p["iters"] // 10), save_total_limit=2, eval_strategy="steps",
         eval_steps=max(10, p["iters"] // 4), max_length=p["max_seq_len"], seed=p["seed"], report_to=[],
     )
