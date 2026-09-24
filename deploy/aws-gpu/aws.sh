@@ -5,6 +5,7 @@
 set -euo pipefail
 REGION=${REGION:-us-east-1}
 TYPE=${TYPE:-g5.xlarge}
+MARKET=${MARKET:-spot}          # spot or on-demand
 NAME=ookami-test
 AWS=${AWS:-aws}
 KEY=~/.ssh/$NAME.pem
@@ -29,14 +30,16 @@ up() {
   fi
   ip=$(curl -s https://checkip.amazonaws.com)
   a ec2 authorize-security-group-ingress --group-id "$sg" --protocol tcp --port 22 --cidr "$ip/32" 2>/dev/null || true
+  local market=()
+  [ "$MARKET" = spot ] && market=(--instance-market-options 'MarketType=spot,SpotOptions={SpotInstanceType=one-time,InstanceInterruptionBehavior=terminate}')
   iid=$(a ec2 run-instances --image-id "$ami" --instance-type "$TYPE" --key-name $NAME --security-group-ids "$sg" \
-        --instance-market-options 'MarketType=spot,SpotOptions={SpotInstanceType=one-time,InstanceInterruptionBehavior=terminate}' \
+        ${market[@]+"${market[@]}"} \
         --instance-initiated-shutdown-behavior terminate \
         --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=150,VolumeType=gp3,DeleteOnTermination=true}' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$NAME},{Key=project,Value=$NAME}]" \
         --query 'Instances[0].InstanceId' --output text)
   echo "IID=$iid" > "$STATE"; echo "SG=$sg" >> "$STATE"
-  echo "launched $iid ($TYPE spot, $ami); waiting for it to run"
+  echo "launched $iid ($TYPE $MARKET, $ami); waiting for it to run"
   a ec2 wait instance-running --instance-ids "$iid"
   ip=$(a ec2 describe-instances --instance-ids "$iid" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
   echo "IP=$ip" >> "$STATE"
