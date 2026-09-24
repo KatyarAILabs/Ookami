@@ -10,6 +10,7 @@ Needs ookami[train-cuda]. Not yet exercised on a GPU in CI; the mlx path is the 
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -40,11 +41,13 @@ def main(job_path: str) -> None:
     lora = LoraConfig(r=p["rank"], lora_alpha=p["alpha"], lora_dropout=p["dropout"],
                       target_modules="all-linear", task_type="CAUSAL_LM")
     args = SFTConfig(
-        output_dir=str(ckpt_dir), max_steps=p["iters"], per_device_train_batch_size=p["batch_size"],
+        # plan iters count micro-batches; TRL's max_steps counts optimizer steps (micro-batches / accumulation)
+        output_dir=str(ckpt_dir), max_steps=max(1, math.ceil(p["iters"] / p["grad_accumulation"])),
+        per_device_train_batch_size=p["batch_size"],
         gradient_accumulation_steps=p["grad_accumulation"], learning_rate=p["learning_rate"],
         gradient_checkpointing=p["grad_checkpoint"], bf16=bf16, fp16=not bf16, logging_steps=10,
-        save_steps=max(10, p["iters"] // 10), save_total_limit=2, eval_strategy="steps",
-        eval_steps=max(10, p["iters"] // 4), max_length=p["max_seq_len"], seed=p["seed"], report_to=[],
+        save_steps=max(10, p["iters"] // p["grad_accumulation"] // 10), save_total_limit=2, eval_strategy="steps",
+        eval_steps=max(10, p["iters"] // p["grad_accumulation"] // 4), max_length=p["max_seq_len"], seed=p["seed"], report_to=[],
     )
     trainer = SFTTrainer(model=model, args=args, train_dataset=ds["train"], eval_dataset=ds["validation"],
                          processing_class=tok, peft_config=lora)

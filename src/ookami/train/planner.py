@@ -6,6 +6,7 @@ train.overrides.
 from __future__ import annotations
 
 import math
+import re
 import platform
 import shutil
 import subprocess
@@ -28,7 +29,7 @@ class Plan:
     batch_size: int = 1
     grad_accumulation: int = 8
     epochs: float = 1.0
-    iters: int = 0                   # derived from epochs unless overridden
+    iters: int = 0                   # micro-batches (not optimizer steps); derived from epochs unless overridden
     max_seq_len: int = 4096
     grad_checkpoint: bool = True
     seed: int = 0
@@ -54,32 +55,52 @@ def accelerator_memory_gb(engine: str) -> float | None:
     return None
 
 
+PARAMS_IN_NAME = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s*[bB](?![a-zA-Z])")
+EFFECTIVE_BATCH = 8
+
+
+def params_from_name(*names: str) -> float | None:
+    """'Qwen/Qwen2.5-1.5B-Instruct' -> 1.5. Ignores bit widths like '4bit'."""
+    for n in names:
+        m = PARAMS_IN_NAME.search(n or "")
+        if m:
+            return float(m.group(1))
+    return None
+
+
 def plan(spec: ModelSpec, engine: str, n_train: int, memory_gb: float | None = None, weights: str = "") -> Plan:
     entry = CATALOG.get(spec.base)
-    params_b = entry.params_b if entry else None
+    params_b = entry.params_b if entry and entry.params_b else params_from_name(weights, spec.base or "")
     mem = memory_gb if memory_gb is not None else accelerator_memory_gb(engine)
     p = Plan(engine=engine, quantize=False, memory_gb=mem)
     prequantized = any(t in weights.lower() for t in ("4bit", "8bit", "awq", "gptq", "mxfp4"))
 
     if params_b is None:
-        p.notes.append("parameter count unknown; using conservative defaults")
+        p.notes.append("parameter count unknown; using conservative defaults (set train.overrides to tune)")
         p.quantize = engine == "trl"
     elif mem is not None:
         bf16_need = params_b * 2 * 1.3 + 4          # weights + LoRA/optimizer/activations headroom, GB (estimate)
         q4_need = params_b * 0.6 * 1.3 + 4
         if prequantized:
+            need = q4_need
             p.notes.append(f"weights are pre-quantized ({weights}); training LoRA on top (QLoRA)")
         elif bf16_need <= mem:
+            need = bf16_need
             p.notes.append(f"LoRA in 16-bit fits: ~{bf16_need:.0f} GB of {mem:.0f} GB")
         elif q4_need <= mem:
+            need = q4_need
             p.quantize = True
             p.notes.append(f"16-bit needs ~{bf16_need:.0f} GB of {mem:.0f} GB; using 4-bit QLoRA (~{q4_need:.0f} GB)")
         else:
+            need = q4_need
             p.quantize = True
             p.notes.append(f"~{q4_need:.0f} GB needed even in 4-bit, {mem:.0f} GB available; expect to run out of memory")
-        if mem >= 48:
-            p.grad_checkpoint = False
-            p.batch_size, p.grad_accumulation = 2, 4
+        # spend spare memory on bigger micro-batches (faster), keeping the effective batch at 8
+        headroom = mem - need
+        micro = 8 if headroom >= 12 else 4 if headroom >= 6 else 2 if headroom >= 3 else 1
+        p.batch_size, p.grad_accumulation = micro, max(1, EFFECTIVE_BATCH // micro)
+        p.grad_checkpoint = micro <= 2
+        p.notes.append(f"batch {micro} x {p.grad_accumulation} accumulation (~{headroom:.0f} GB spare)")
     else:
         p.notes.append("accelerator memory unknown; using conservative defaults")
 

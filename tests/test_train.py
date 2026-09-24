@@ -63,10 +63,15 @@ def test_snapshot_refuses_when_not_ready(write):
 
 def test_planner_fits_memory_and_honours_overrides(write):
     spec = load(config(write)).models["m"].spec
-    small = plan(spec, "trl", 1000, memory_gb=12)
-    assert small.quantize and small.iters == 1000
+    small = plan(spec, "trl", 1000, memory_gb=12)          # 4B: 16-bit ~14 GB doesn't fit; 4-bit ~7 GB leaves ~5
+    assert small.quantize and (small.batch_size, small.grad_accumulation) == (2, 4) and small.iters == 500
     big = plan(spec, "trl", 1000, memory_gb=80)
-    assert not big.quantize and not big.grad_checkpoint and big.iters == 500
+    assert not big.quantize and not big.grad_checkpoint and (big.batch_size, big.grad_accumulation) == (8, 1)
+    assert big.iters == 125                                   # iters count micro-batches: 1000 rows / 8
+    from ookami.train.planner import params_from_name
+    assert params_from_name("Qwen/Qwen2.5-1.5B-Instruct") == 1.5
+    assert params_from_name("mlx-community/Qwen3-4B-Instruct-2507-4bit") == 4.0
+    assert params_from_name("no-size-here") is None
     spec.train.overrides = {"lora.rank": 8, "iters": 42}
     o = plan(spec, "mlx", 1000, memory_gb=27, weights="mlx-community/x-4bit")
     assert (o.rank, o.alpha, o.iters) == (8, 16, 42) and "pre-quantized" in o.notes[0]

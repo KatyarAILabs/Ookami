@@ -53,7 +53,7 @@ test_() {
   ssh -i "$KEY" ubuntu@"$IP" 'mkdir -p ~/kit ~/wheel && rm -f ~/wheel/*'
   scp -q -i "$KEY" "$ROOT"/dist/*.whl ubuntu@"$IP":~/wheel/
   scp -q -i "$KEY" "$HERE"/ookami.yaml "$HERE"/make_data.py "$HERE"/test.sh ubuntu@"$IP":~/kit/
-  ssh -i "$KEY" ubuntu@"$IP" 'sudo docker run --rm --gpus all --ipc=host --entrypoint bash \
+  ssh -i "$KEY" ubuntu@"$IP" 'sudo docker run --rm --gpus all --ipc=host -e PYTHONUNBUFFERED=1 --entrypoint bash \
       -v ~/kit:/kit -v ~/wheel:/wheel -v ~/hf:/root/.cache/huggingface vllm/vllm-openai:latest /kit/test.sh' \
       2>&1 | tee "$HERE/last-run.log"
 }
