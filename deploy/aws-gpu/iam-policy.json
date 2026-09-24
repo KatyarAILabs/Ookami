@@ -1,0 +1,65 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadOnly",
+      "Effect": "Allow",
+      "Action": ["ec2:Describe*", "servicequotas:Get*", "servicequotas:List*", "sts:GetCallerIdentity"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RequestGpuQuota",
+      "Effect": "Allow",
+      "Action": ["servicequotas:RequestServiceQuotaIncrease"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PublicAmiParameters",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:*::parameter/aws/service/*"
+    },
+    {
+      "Sid": "LaunchTaggedInstances",
+      "Effect": "Allow",
+      "Action": ["ec2:RunInstances", "ec2:CreateTags"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:RequestTag/project": "forge-test"}}
+    },
+    {
+      "Sid": "LaunchSupportingResources",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:*::image/*",
+        "arn:aws:ec2:*:*:subnet/*",
+        "arn:aws:ec2:*:*:network-interface/*",
+        "arn:aws:ec2:*:*:security-group/*",
+        "arn:aws:ec2:*:*:key-pair/*",
+        "arn:aws:ec2:*:*:volume/*",
+        "arn:aws:ec2:*:*:spot-instances-request/*"
+      ]
+    },
+    {
+      "Sid": "ManageOnlyTaggedInstances",
+      "Effect": "Allow",
+      "Action": ["ec2:TerminateInstances", "ec2:StopInstances", "ec2:StartInstances"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:ResourceTag/project": "forge-test"}}
+    },
+    {
+      "Sid": "KitKeyPairAndSecurityGroup",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateKeyPair", "ec2:DeleteKeyPair", "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
+                 "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SpotServiceLinkedRole",
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "*",
+      "Condition": {"StringEquals": {"iam:AWSServiceName": "spot.amazonaws.com"}}
+    }
+  ]
+}
