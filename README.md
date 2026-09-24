@@ -100,19 +100,15 @@ def score(example, output) -> Score:
     return Score(float(ok), passed=ok)
 ```
 
-## Layout
+## Documentation
 
-| Path | What |
+| | |
 |---|---|
-| `src/forge/config.py` | `forge.yaml` schema (Pydantic) and lints. It is also the source for JSON Schema and, later, the CRDs |
-| `src/forge/catalog.py` | Known base models: licence and weights per engine |
-| `src/forge/local/` | The local backend: engines (vllm, mlx, command), the managed gateway, process supervision |
-| `src/forge/train/` | Planner, trainer backends (mlx, trl, command), job queue and worker, post-train gate |
-| `src/forge/registry.py` | Versions, gate decisions, promotions, event log (SQLite) |
-| `src/forge/interfaces.py` | `JobRunner`, `ModelServer`, `Router`: the seams each backend implements |
-| `src/forge/evaluators/` | Evaluator SDK and built-ins |
-| `src/forge/data.py` | Datasets, frozen splits, getting outputs from targets |
-| `src/forge/stats.py` | Paired bootstrap and gate tests |
-| `src/forge/eval_runner.py` | `forge eval` and reports |
+| [Getting started](docs/getting-started.md) | Install, serve, fine-tune, put live |
+| [Architecture](docs/architecture.md) | Components, interfaces, lifecycle, on-disk layout |
+| [forge.yaml reference](docs/reference/forge-yaml.md) | Every field, generated from the code |
+| [CLI](docs/cli.md) · [Serving](docs/serving.md) · [Training](docs/training.md) · [Evaluation](docs/evaluation.md) · [Plugins](docs/plugins.md) | How each part works |
+| [Deployment](docs/deployment.md) · [Verification log](docs/verification.md) | Where it runs, what has been tested |
+| [Plan](docs/plan.md) | Why Forge exists, roadmap |
 
-Apache-2.0.
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under Apache-2.0.
