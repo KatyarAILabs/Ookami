@@ -1,6 +1,6 @@
 {"doc_id": 0, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 1.0}
 {"doc_id": 1, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 1.0}
 {"doc_id": 2, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 1.0}
-{"doc_id": 3, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 1.0}
-{"doc_id": 4, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 0.0}
-{"doc_id": 5, "filter": "strict-match", "metrics": ["exact_match"], "exact_match": 0.0}
+{"doc_id": 0, "filter": "flexible-extract", "metrics": ["exact_match"], "exact_match": 1.0}
+{"doc_id": 1, "filter": "flexible-extract", "metrics": ["exact_match"], "exact_match": 1.0}
+{"doc_id": 2, "filter": "flexible-extract", "metrics": ["exact_match"], "exact_match": 1.0}
