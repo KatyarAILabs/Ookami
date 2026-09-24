@@ -31,6 +31,20 @@ The gateway is set by `gateway.mode`:
 - **Where LiteLLM comes from:** the managed gateway needs `forge-ml[gateway]`. Forge prefers the LiteLLM installed next to itself over one on `PATH`. A LiteLLM installed without its proxy extras fails to start, and Forge's error says so.
 - **Stable model ids:** clients send the same model id before and after a new version goes live, so the gateway config doesn't change on promotion.
 
+## Tracing with Trajectory
+
+With `components.tracing` enabled and `Platform.tracing` set:
+- **Managed collector:** `forge up` first starts the collector (`cc run -config <tracing.config>`, `mode: managed`) and waits for `tracing.healthUrl`.
+- **Gateway wiring:** the managed gateway is given `litellm_settings.callbacks: [generic_api]` and `GENERIC_LOGGER_ENDPOINT=<tracing.webhook>`. With `tracing.tokenEnv`, it also gets a bearer header read from that environment variable.
+- **External gateway:** add the same two settings to your own LiteLLM.
+
+**What clients should send** for runs to be grouped well (from Trajectory's LiteLLM guide):
+- `litellm_session_id`, one per agent run;
+- `metadata.task_type`;
+- `metadata.episode_end: true` on the last call.
+
+The collector config, including its redaction policy, is yours: Forge doesn't generate it.
+
 ## Serving trained versions
 
 - **What gets served:** `forge up` serves each Model's **live** (promoted) version. With nothing promoted, it serves the base model.

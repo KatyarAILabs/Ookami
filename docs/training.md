@@ -11,7 +11,7 @@
 | `jsonl` | A JSONL file |
 | `parquet` | A Parquet file or directory (needs `forge-ml[parquet]`) |
 | `hf` | A Hugging Face dataset, `name` or `name:split` (needs `forge-ml[hf]`) |
-| `traces` | Gateway traffic (planned) |
+| `traces` | Traffic captured by Trajectory: `cc export -format chat` on the lake (see below) |
 
 **Row format:**
 - `messages` (chat), `input` or `prompt`;
@@ -26,6 +26,31 @@
 - **Training target:** the reference message, or else the label as text. Rows with neither are skipped and counted.
 - **Output:** a `train.jsonl`, plus a small `valid.jsonl` (used only for loss curves), written to `<storage>/datasets/<model>/<hash>/` with a manifest.
 - **Minimum size:** training refuses to start when there are fewer training rows than `data.minExamples`.
+
+### Training on captured traffic (Trajectory)
+
+```yaml
+data:
+  source:
+    traces: { minReward: 1 }        # lake defaults to Platform.tracing.lake
+```
+
+**What Forge runs:** `cc export -lake <lake> -format chat -require-final=false` before each snapshot, plus these filters when set:
+
+| Field | Keeps |
+|---|---|
+| `minReward` | Episodes scored at or above this |
+| `requireReward` | Only episodes a scorer has rewarded |
+| `requireFinal` | Only episodes whose outcome labels are final |
+| `verifier` | Rewards from this scorer, when the lake has several |
+| `asOf` | The lake as it stood at this time |
+
+**Each exported model call becomes one example:**
+- the messages the model saw, with its answer as the reference;
+- `episode_id`, `step_idx` and `reward` as metadata, so `stratifyBy` and evaluators can use them;
+- ids of the form `<episode_id>:<step_idx>`.
+
+**Why filter:** without a reward filter, every captured answer is trained on, including wrong ones. Load outcomes and score them in Trajectory (`cc outcomes`, `cc score`), then set `minReward`.
 
 ## 2. Plan
 

@@ -35,7 +35,7 @@
 | training | done (SFT) | Versioned data snapshots, memory planner, one-job queue, trainers (MLX, TRL, command), checkpoints |
 | eval | done | Frozen splits, candidate vs incumbent, paired bootstrap, gate, reports |
 | registry | done | Every version with its data hash, config hash, gate decision, report and status; event log |
-| tracing | planned (0.3) | Capture gateway traffic into storage as training data |
+| tracing | done, via [Trajectory](https://github.com/KatyarAILabs/trajectory) | Forge runs (or points at) a Trajectory collector and wires the gateway's LiteLLM `generic_api` callback to it. `data.source.traces` trains on the lake through `cc export -format chat` |
 | hand-off | planned (0.3) | Shadow, canary, live and rollback at the gateway |
 | console | planned (0.5) | Web UI |
 
@@ -115,3 +115,4 @@ Everything lives under `Platform.spec.storage.uri`:
 | Serve fused MLX models | mlx-lm 0.31's server ignores `--adapter-path` unless every request names the adapter (see [verification](verification.md)) |
 | Few bundled services; bring your own Postgres and bucket in production | Supporting many stateful services on users' clusters is costly |
 | Only Apache-2.0 / MIT / BSD dependencies | So security teams can approve the SBOM |
+| Tracing is Trajectory, not a Forge component | Capture, redaction, outcome joins and rewards are a separate open-source project. Forge runs it and reads its exports rather than duplicating it; the redaction policy stays the user's own Trajectory config |

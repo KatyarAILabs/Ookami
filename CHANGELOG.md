@@ -2,6 +2,11 @@
 
 ## 0.2.0 (unreleased)
 
+- **Tracing through Trajectory:**
+  - `Platform.tracing` runs or points at a Trajectory collector;
+  - the managed gateway sends every completion to it through LiteLLM's `generic_api` callback;
+  - `data.source.traces` trains on the lake via `cc export -format chat`, with reward, finality, verifier and as-of filters.
+
 - **`forge train`:**
   - versioned data snapshots (held-out and audit rows never trained on);
   - memory planner;

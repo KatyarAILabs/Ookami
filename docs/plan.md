@@ -13,7 +13,7 @@
 | **training** | SFT / DPO / GRPO recipes, a memory planner, a one-job queue, checkpoint/resume on spot GPUs | TRL, prime-rl, Kueue |
 | **eval** | Frozen held-out sets, candidate-vs-incumbent statistics, a promotion gate, reports. **You bring the evaluators** | Ours + lm-eval-harness / Inspect / any command |
 | **registry** | Every base, adapter, dataset version, eval report and deploy state, with lineage | Postgres + your bucket; MLflow export |
-| **tracing** | Captures gateway traffic into your bucket as training data | OTel collector, Parquet |
+| **tracing** | Captures gateway traffic into your bucket as training data | [Trajectory](https://github.com/KatyarAILabs/trajectory) (separate open-source project); Forge runs it and trains on its exports |
 | **console** | A web UI over all of the above | Ours |
 | **GPU lifecycle** | On-demand nodes, spot with fallback, budgets | Karpenter / GKE NAP + DWS / AKS NAP, SkyPilot |
 
@@ -137,7 +137,7 @@ forge.yaml ─► controller (reconcile loop per Model; queue; registry; eval ru
 | **0.0.1 (done)** | `forge.yaml` schema, `validate`, `schema`, backend interfaces, Evaluator SDK, `forge eval` + gate + reports, 42 tests | `forge eval` gives the correct pass/fail on recorded results and on a live command |
 | **0.1: one GPU box (done, except registry)** | `forge up` / `status` / `logs` / `down`; engines vllm, mlx, command; managed LiteLLM gateway (`forge-ml[gateway]`); evaluator plugins via entry points. Verified on Apple silicon (MLX + LiteLLM); vLLM path not yet run on a GPU | `pip install forge-ml && forge up -f examples/serve-only.yaml` serves gpt-oss-20b behind the gateway on a fresh machine |
 | **0.2: train + gate (done)** | JSONL/Parquet/HF ingest and versioned snapshots; memory planner; `train_sft` on mlx, trl or a command; one-job queue with checkpoint/resume; automatic gate vs the live version; registry with gated `promote`; `forge up` serves the live version | Verified on Apple silicon: a 4B model trained, was rejected when broken, passed when fixed (82% vs 0% held out), and served through the gateway. The TRL path is not yet run on a GPU. Promotion restarts the engine; runtime adapter hot-load moves to 0.3 |
-| **0.3: hand-off + tracing** | LiteLLM router plugin (shadow/canary/live/rollback), tracing component, `train_rl` (GRPO) | A route moves from an API model to the fine-tuned model and rolls back automatically on a metric drop |
+| **0.3: hand-off** | LiteLLM router plugin (shadow/canary/live/rollback), `train_rl` (GRPO). Tracing already done through Trajectory | A route moves from an API model to the fine-tuned model and rolls back automatically on a metric drop |
 | **0.4: Kubernetes** | Operator + CRDs, OCI Helm chart, Kueue, GPU profiles, KEDA, external Postgres/S3, `doctor`, `upgrade` | Clean EKS and GKE installs in < 30 min; training runs on a spot node that exists only for the job |
 | **0.5: enterprise delivery** | Zarf/ModelPack air-gap bundle, cosign/SBOM gate, SkyPilot backend, console, lm-eval/Inspect evaluators | Air-gapped install on a disconnected k3s VM |
 

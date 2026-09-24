@@ -24,7 +24,9 @@ spec:
 > - `forge models` / `promote`: a registry that refuses to put a version live unless it passed its gate;
 > - `forge eval` with your own evaluators or plugins.
 >
-> Gateway hand-off (shadow/canary/rollback), traffic capture and GRPO are next. See [docs/plan.md](docs/plan.md).
+> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory): the managed gateway sends every call to the collector, and `data.source.traces` trains on its lake.
+>
+> Gateway hand-off (shadow/canary/rollback) and GRPO are next. See [docs/plan.md](docs/plan.md).
 
 ## Quickstart: fine-tune, gate and serve on one machine
 
@@ -46,7 +48,7 @@ On an M3 Max, `forge train` took about 6 minutes (Qwen3-4B, 4-bit, 2 epochs). Th
 | training | on | TRL (SFT/DPO), prime-rl (GRPO), Kueue |
 | eval | on | Forge gate + your evaluators |
 | registry | on | Postgres + your bucket |
-| tracing | off | OTel collector → Parquet |
+| tracing | off | [Trajectory](https://github.com/KatyarAILabs/trajectory): gateway callbacks → redacted Parquet lake |
 | console | off | Forge UI |
 
 ## Try it
