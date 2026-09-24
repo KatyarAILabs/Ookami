@@ -89,7 +89,7 @@ Full reference: `examples/forge.yaml`. JSON Schema: `forge schema`.
 
 **Forge owns the machinery. You own the judgement.** This followed a council review on 24 Sep 2026.
 
-- **Evaluators you bring:**
+- **Evaluators you bring** (or install as plugins, via the `forge.evaluators` entry point):
   - a labels column;
   - a Python function (`@evaluator`);
   - a webhook;
@@ -135,7 +135,7 @@ forge.yaml ─► controller (reconcile loop per Model; queue; registry; eval ru
 | Version | Ships | Exit test |
 |---|---|---|
 | **0.0.1 (done)** | `forge.yaml` schema, `validate`, `schema`, backend interfaces, Evaluator SDK, `forge eval` + gate + reports, 42 tests | `forge eval` gives the correct pass/fail on recorded results and on a live command |
-| **0.1: one GPU box** | `forge up`: managed LiteLLM + vLLM serving a catalog model; registry; `status` | `pip install forge-ml && forge up -f examples/serve-only.yaml` serves gpt-oss-20b behind the gateway on a fresh machine |
+| **0.1: one GPU box (done, except registry)** | `forge up` / `status` / `logs` / `down`; engines vllm, mlx, command; managed LiteLLM gateway (`forge-ml[gateway]`); evaluator plugins via entry points. Verified on Apple silicon (MLX + LiteLLM); vLLM path not yet run on a GPU | `pip install forge-ml && forge up -f examples/serve-only.yaml` serves gpt-oss-20b behind the gateway on a fresh machine |
 | **0.2: train + gate** | Dataset ingest (JSONL/Parquet/HF), `train_sft`, memory planner, queue, checkpoints, automatic gate after training, adapter hot-load | A LoRA SFT on a public dataset trains, passes or fails its gate, and serves with no manual steps |
 | **0.3: hand-off + tracing** | LiteLLM router plugin (shadow/canary/live/rollback), tracing component, `train_rl` (GRPO) | A route moves from an API model to the fine-tuned model and rolls back automatically on a metric drop |
 | **0.4: Kubernetes** | Operator + CRDs, OCI Helm chart, Kueue, GPU profiles, KEDA, external Postgres/S3, `doctor`, `upgrade` | Clean EKS and GKE installs in < 30 min; training runs on a spot node that exists only for the job |

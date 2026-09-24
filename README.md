@@ -18,13 +18,12 @@ spec:
   base: gpt-oss-20b
 ```
 
-> **Status: 0.0.1, early.** What works today:
-> - the config schema and `forge validate`;
-> - `forge schema`;
-> - the Evaluator SDK;
-> - `forge eval`, the promotion gate.
+> **Status: 0.1, early.** What works today:
+> - `forge up` / `status` / `logs` / `down` on one machine: open models served by vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, behind a managed LiteLLM gateway;
+> - the config schema, `forge validate` and `forge schema`;
+> - `forge eval`, the promotion gate, with evaluator plugins.
 >
-> Serving (`forge up`), training and gateway hand-off are next. See [docs/plan.md](docs/plan.md).
+> Training and gateway hand-off are next. See [docs/plan.md](docs/plan.md).
 
 ## Components
 
@@ -41,7 +40,13 @@ spec:
 ## Try it
 
 ```bash
-uv sync
+uv sync --extra gateway                              # or: pip install 'forge-ml[gateway]'
+# engines are installed separately: pip install vllm (NVIDIA) or pip install mlx-lm (Apple silicon)
+uv run forge up -f examples/serve-only.yaml           # model + gateway on this machine
+curl localhost:4000/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model": "gpt-oss", "messages": [{"role": "user", "content": "hi"}]}'
+uv run forge down -f examples/serve-only.yaml
+
 uv run forge validate -f examples/forge.yaml          # full loop on EKS
 uv run forge validate -f examples/serve-only.yaml     # one GPU box
 uv run forge schema > forge.schema.json               # editor autocomplete
@@ -60,6 +65,7 @@ uv run pytest
   - `python`: a function decorated with `@evaluator`;
   - `webhook`;
   - `command`: any harness that writes `{"item_id", "score"}` JSONL;
+  - `plugin`: evaluators shipped as separate packages through the `forge.evaluators` entry point;
   - `lm-eval` and `inspect`: planned;
   - `forge/structural`: JSON and tool-call shape only.
 - **What Forge adds:**
@@ -87,6 +93,8 @@ def score(example, output) -> Score:
 | Path | What |
 |---|---|
 | `src/forge/config.py` | `forge.yaml` schema (Pydantic) and lints. It is also the source for JSON Schema and, later, the CRDs |
+| `src/forge/catalog.py` | Known base models: licence and weights per engine |
+| `src/forge/local/` | The local backend: engines (vllm, mlx, command), the managed gateway, process supervision |
 | `src/forge/interfaces.py` | `JobRunner`, `ModelServer`, `Router`: the seams each backend implements |
 | `src/forge/evaluators/` | Evaluator SDK and built-ins |
 | `src/forge/data.py` | Datasets, frozen splits, getting outputs from targets |
