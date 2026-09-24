@@ -357,7 +357,7 @@ function chart(daily) {
     const bh = ((H - pad * 2) * d.requests) / max;
     const x = pad + i * bw + bw * 0.15, y = H - pad - bh;
     const label = new Date(d.day * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    return `<rect class="col" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="3"><title>${h(label)}: ${d.requests} requests, ${d.tokens} tokens</title></rect>
+    return `<rect class="col" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}"><title>${h(label)}: ${d.requests} requests, ${d.tokens} tokens</title></rect>
       ${daily.length <= 14 ? `<text x="${(x + bw * 0.35).toFixed(1)}" y="${H - 6}" text-anchor="middle">${h(label)}</text>` : ""}`;
   }).join("");
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Requests per day">

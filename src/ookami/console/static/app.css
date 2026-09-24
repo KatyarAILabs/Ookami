@@ -118,7 +118,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--t
 .bar { height: 4px; background: var(--line); overflow: hidden; min-width: 90px; margin-bottom: 6px; }
 .bar > span { display: block; height: 100%; background: var(--text); }
 .bar.over > span { background: var(--red); }
-.chart { width: 100%; max-width: 100%; height: auto; display: block; }
+.chart { width: 100%; max-width: 760px; height: auto; display: block; }
 .chart .col { fill: var(--text); }
 .chart .axis { stroke: var(--line); }
 .chart text { fill: var(--muted); font-size: 11px; font-family: var(--mono); }

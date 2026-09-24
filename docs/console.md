@@ -24,6 +24,8 @@ A web UI over everything Ookami runs: services, models and their versions, train
 
 ![Models](images/console-models.png)
 
+![Training](images/console-training.png)
+
 ![Usage](images/console-usage.png)
 
 ## Design choices
