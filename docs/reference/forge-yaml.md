@@ -46,6 +46,7 @@ The OpenAI-compatible gateway in front of every model.
 | `url` | str (optional) | - | required for an external gateway |
 | `adminKey` | str (optional) | - | secret reference for the gateway's admin API |
 | `port` | int | `4000` | managed gateway port |
+| `auth` | `keys` \| `none` | `keys` | keys: every call needs a Forge key (forge keys create) or the master key; none: open |
 | `command` | str (optional) | - | advanced: launch template for a managed gateway, with {config} {port} {host} |
 
 ### Components
@@ -120,7 +121,8 @@ Compute for inference engines.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `base` | str | **required** | catalog name, or any name when weights and licence are set |
+| `base` | str (optional) | - | catalog name, or any name when weights and licence are set |
+| `provider` | [Provider](#provider) (optional) | - | route an API model instead of serving a base model |
 | `licence` | str (optional) | - | required when base is not in forge's catalog |
 | `weights` | str (optional) | - | Hugging Face id or local path; defaults to the catalog's |
 | `serve` | [Serve](#serve) | see below | How the model is served. |
@@ -128,6 +130,17 @@ Compute for inference engines.
 | `train` | [Train](#train) (optional) | - | omit to only serve the base model |
 | `eval` | [Eval](#eval) (optional) | - | required when train is set |
 | `handoff` | [Handoff](#handoff) | see below | gateway hand-off (planned) |
+
+### Provider
+
+An API model routed through the gateway next to your self-hosted models (any LiteLLM provider).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | str | **required** | LiteLLM provider prefix, e.g. openai, anthropic, azure, bedrock, vertex_ai |
+| `model` | str | **required** | the provider's model id, e.g. gpt-5-mini |
+| `apiKey` | str (optional) | - | secret reference; ${secret:NAME} reads env var NAME locally |
+| `apiBase` | str (optional) | - | override the provider's base URL |
 
 ### Serve
 
@@ -141,6 +154,7 @@ How the model is served.
 | `port` | int (optional) | - | engine port; default: first free from 8100 |
 | `host` | str | `127.0.0.1` | bind address for the engine |
 | `args` | list of str | `[]` | extra engine flags, e.g. [--max-model-len, '8192'] |
+| `costPerHour` | float (optional) | - | what the engine's hardware costs per hour (USD), split across keys by token share in forge usage |
 
 ### Data
 

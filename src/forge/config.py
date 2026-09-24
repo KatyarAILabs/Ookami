@@ -82,6 +82,8 @@ class Gateway(Strict):
     url: str | None = Field(None, description="required for an external gateway")
     adminKey: str | None = Field(None, description="secret reference for the gateway's admin API")
     port: int = Field(4000, ge=1, le=65535, description="managed gateway port")
+    auth: Literal["keys", "none"] = Field(
+        "keys", description="keys: every call needs a Forge key (forge keys create) or the master key; none: open")
     command: str | None = Field(None, description="advanced: launch template for a managed gateway, "
                                                   "with {config} {port} {host}")
 
@@ -376,6 +378,19 @@ class Handoff(Strict):
         return v
 
 
+class Provider(Strict):
+    """An API model routed through the gateway next to your self-hosted models (any LiteLLM provider)."""
+    name: str = Field(description="LiteLLM provider prefix, e.g. openai, anthropic, azure, bedrock, vertex_ai")
+    model: str = Field(description="the provider's model id, e.g. gpt-5-mini")
+    apiKey: str | None = Field(None, description="secret reference; ${secret:NAME} reads env var NAME locally")
+    apiBase: str | None = Field(None, description="override the provider's base URL")
+
+    @field_validator("apiKey")
+    @classmethod
+    def _key_is_secret(cls, v: str | None) -> str | None:
+        return _secret(v)
+
+
 class Serve(Strict):
     """How the model is served."""
     engine: Literal["auto", "vllm", "mlx", "command"] = Field(
@@ -385,6 +400,8 @@ class Serve(Strict):
     port: int | None = Field(None, ge=1, le=65535, description="engine port; default: first free from 8100")
     host: str = Field("127.0.0.1", description="bind address for the engine")
     args: list[str] = Field([], description="extra engine flags, e.g. [--max-model-len, '8192']")
+    costPerHour: float | None = Field(None, ge=0, description="what the engine's hardware costs per hour (USD), "
+                                                             "split across keys by token share in forge usage")
 
     @model_validator(mode="after")
     def _command(self) -> "Serve":
@@ -394,7 +411,8 @@ class Serve(Strict):
 
 
 class ModelSpec(Strict):
-    base: str = Field(description="catalog name, or any name when weights and licence are set")
+    base: str | None = Field(None, description="catalog name, or any name when weights and licence are set")
+    provider: Provider | None = Field(None, description="route an API model instead of serving a base model")
     licence: str | None = Field(None, description="required when base is not in forge's catalog")
     weights: str | None = Field(None, description="Hugging Face id or local path; defaults to the catalog's")
     serve: Serve = Serve()
@@ -405,6 +423,12 @@ class ModelSpec(Strict):
 
     @model_validator(mode="after")
     def _check(self) -> "ModelSpec":
+        if (self.base is None) == (self.provider is None):
+            raise ValueError("set exactly one of base (self-hosted) or provider (API model)")
+        if self.provider is not None:
+            if self.train or self.data:
+                raise ValueError("an API model can't be trained here; set base to fine-tune an open model")
+            return self
         if self.base not in BASE_MODELS:
             if self.licence is None:
                 raise ValueError(f"base {self.base!r} is not in the catalog; set licence to its licence")
@@ -513,6 +537,9 @@ def lint(cfg: Config) -> list[Issue]:
     if cfg.platform is None:
         out.append(Issue("warning", cfg.path.name, "no Platform document; commands that need storage or a gateway will fail"))
     plat = cfg.platform.spec if cfg.platform else None
+    if plat and plat.gateway.mode == "managed" and plat.gateway.auth == "none":
+        out.append(Issue("warning", f"Platform/{cfg.platform.metadata.name}",
+                         "gateway.auth none: anyone who can reach the gateway can use every model"))
     if plat and plat.components.tracing.enabled:
         where = f"Platform/{cfg.platform.metadata.name}"
         if not plat.tracing:
@@ -527,7 +554,7 @@ def lint(cfg: Config) -> list[Issue]:
         spec = m.spec
         if plat:
             c = plat.components
-            needs = [("serving", True), ("training", spec.train is not None), ("eval", spec.eval is not None),
+            needs = [("serving", spec.base is not None), ("training", spec.train is not None), ("eval", spec.eval is not None),
                      ("registry", spec.train is not None)]
             for comp, needed in needs:
                 if needed and not getattr(c, comp).enabled:

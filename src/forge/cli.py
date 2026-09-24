@@ -64,6 +64,8 @@ def cmd_up(args: argparse.Namespace) -> int:
         if s.kind == "engine":
             via = f"{gw.url}  model={s.name}" if gw else f"{s.url}  model={s.model_id}"
             print(f"{s.name:24} {via}")
+    if gw and cfg.platform.spec.gateway.auth == "keys":
+        print("\ngateway auth is on: create a key with `forge keys create NAME`, or use `forge keys master`")
     print("\nforge status | forge logs <name> | forge down")
     return 0
 
@@ -218,6 +220,82 @@ def cmd_promote(args: argparse.Namespace) -> int:
     return 0
 
 
+def _keystore(args):
+    from .gateway.keys import KeyStore
+    from .local.runtime import storage_dir
+
+    cfg = _load_ok(args.file)
+    return (KeyStore(storage_dir(cfg)), cfg) if cfg else (None, None)
+
+
+def cmd_keys(args: argparse.Namespace) -> int:
+    ks, _ = _keystore(args)
+    if ks is None:
+        return 1
+    try:
+        if args.action == "create":
+            if not args.name:
+                print("error: forge keys create NAME", file=sys.stderr)
+                return 1
+            key = ks.create(args.name, args.team, args.budget, args.rpm)
+            print(key)
+            print(f"# key {args.name!r} for team {args.team!r}"
+                  f"{f', budget ${args.budget:g}/month' if args.budget is not None else ''}"
+                  f"{f', {args.rpm} req/min' if args.rpm else ''}. Shown once; Forge stores only its hash.",
+                  file=sys.stderr)
+        elif args.action == "list":
+            keys = ks.list()
+            if not keys:
+                print("no keys (forge keys create NAME)")
+            for k in keys:
+                state = "revoked" if k.revoked_at else "active"
+                spent = ks.spend_this_month(k.key_hash)
+                budget = f"${spent:.2f} of ${k.budget_usd:g}" if k.budget_usd is not None else f"${spent:.2f}"
+                print(f"{k.name:20} {k.team:14} {k.prefix}…  {state:8} {budget:>20} this month"
+                      f"{f'  {k.rpm}/min' if k.rpm else ''}")
+        elif args.action == "revoke":
+            n = ks.revoke(args.name or "")
+            print(f"revoked {n} key(s)")
+            return 0 if n else 1
+        elif args.action == "master":
+            print(ks.master_key())
+    finally:
+        ks.close()
+    return 0
+
+
+def cmd_usage(args: argparse.Namespace) -> int:
+    import time
+
+    from .gateway.keys import usage_report
+
+    ks, _ = _keystore(args)
+    if ks is None:
+        return 1
+    since = time.time() - _duration(args.since)
+    rows, per_model = usage_report(ks, since, by=args.by)
+    ks.close()
+    if not rows:
+        print("no gateway usage in this period")
+        return 0
+    print(f"{args.by:28} {'requests':>9} {'errors':>7} {'tokens':>11} {'API $':>10} {'self-hosted $':>14} {'total $':>10}")
+    for u in rows:
+        print(f"{u.who:28} {u.requests:9} {u.errors:7} {u.tokens:11} {u.api_cost:10.4f} {u.self_hosted_cost:14.4f} "
+              f"{u.total:10.4f}")
+    hosted = {m: v for m, v in per_model.items() if v["hardware_cost"]}
+    if hosted:
+        print("\nself-hosted models (hardware cost split by token share):")
+        for m, v in hosted.items():
+            per_m = f"${v['cost_per_million_tokens']:.2f} per 1M tokens" if v["cost_per_million_tokens"] else "-"
+            print(f"  {m:24} {v['tokens']:>11} tokens  ${v['hardware_cost']:.4f}  {per_m}")
+    return 0
+
+
+def _duration(text: str) -> float:
+    unit = {"h": 3600, "d": 86400, "m": 60}[text[-1]]
+    return float(text[:-1]) * unit
+
+
 def cmd_worker(args: argparse.Namespace) -> int:
     from .train.jobs import run_worker
     return run_worker(args.file)
@@ -287,6 +365,21 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--force", action="store_true")
     pr.add_argument("--reason")
     pr.set_defaults(fn=cmd_promote)
+
+    k = sub.add_parser("keys", help="gateway keys: create, list, revoke, or show the master key")
+    k.add_argument("action", choices=["create", "list", "revoke", "master"])
+    k.add_argument("name", nargs="?")
+    k.add_argument("-f", "--file", default="forge.yaml")
+    k.add_argument("--team", default="default")
+    k.add_argument("--budget", type=float, help="USD per calendar month (provider cost)")
+    k.add_argument("--rpm", type=int, help="requests per minute")
+    k.set_defaults(fn=cmd_keys)
+
+    us = sub.add_parser("usage", help="gateway spend per key or team: API cost and self-hosted hardware cost")
+    us.add_argument("-f", "--file", default="forge.yaml")
+    us.add_argument("--by", choices=["key", "team"], default="key")
+    us.add_argument("--since", default="30d", help="e.g. 24h, 7d, 30d")
+    us.set_defaults(fn=cmd_usage)
 
     w = sub.add_parser("_worker", help=argparse.SUPPRESS)
     w.add_argument("-f", "--file", default="forge.yaml")

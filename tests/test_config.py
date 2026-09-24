@@ -176,3 +176,21 @@ def test_tracing_component_needs_collector(write):
 
 def test_external_gateway_needs_url(write):
     assert any("gateway.url" in e for e in errors(load(write("f.yaml", PLATFORM + "  gateway: { mode: external }\n"))))
+
+
+def test_provider_models(write):
+    api = PLATFORM + """---
+apiVersion: forge.dev/v1alpha1
+kind: Model
+metadata: { name: gpt }
+spec: { provider: { name: openai, model: gpt-5-mini, apiKey: "${secret:OPENAI_API_KEY}" } }
+"""
+    assert load(write("a.yaml", api)).ok
+    assert any("secret reference" in e for e in errors(load(write("b.yaml", api.replace('"${secret:OPENAI_API_KEY}"', "sk-live")))))
+    both = api.replace("spec: { provider:", "spec: { base: qwen3.5-4b, provider:")
+    assert any("exactly one of base" in e for e in errors(load(write("c.yaml", both))))
+
+
+def test_auth_none_warns(write):
+    cfg = load(write("f.yaml", PLATFORM + "  gateway: { auth: none }\n"))
+    assert any("anyone who can reach" in w for w in warnings(cfg))

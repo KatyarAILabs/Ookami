@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -22,6 +23,7 @@ from pathlib import Path
 import yaml
 
 from ..config import Config
+from ..gateway.keys import KeyStore
 from .engines import EngineError, launch
 
 ENGINE_PORTS = range(8100, 8200)
@@ -166,16 +168,40 @@ def wait_ready(svc: Service, timeout: float) -> None:
 
 # ---------------------------------------------------------------- up / down / status
 
-def gateway_config(engines: list[Service], tracing: bool = False) -> dict:
-    settings: dict = {"drop_params": True}
+HOOKS = "forge.gateway.litellm_hooks"
+
+
+def secret_ref(ref: str | None) -> str | None:
+    """${secret:NAME} -> LiteLLM's os.environ/NAME (the local backend reads secrets from the environment)."""
+    m = re.match(r"^\$\{secret:([A-Za-z0-9_.-]+)\}$", ref or "")
+    return f"os.environ/{m.group(1)}" if m else None
+
+
+def gateway_config(engines: list[Service], tracing: bool = False, providers: list | None = None,
+                   master_key: str | None = None, usage: bool = False) -> dict:
+    """LiteLLM config: one route per Model; auth, usage and tracing hooks when asked for."""
+    models = [{"model_name": s.name,
+               "litellm_params": {"model": f"openai/{s.model_id}", "api_base": s.url, "api_key": "none"}}
+              for s in engines]
+    for doc in providers or []:
+        pv = doc.spec.provider
+        params: dict = {"model": f"{pv.name}/{pv.model}"}
+        if pv.apiKey:
+            params["api_key"] = secret_ref(pv.apiKey)
+        if pv.apiBase:
+            params["api_base"] = pv.apiBase
+        models.append({"model_name": doc.metadata.name, "litellm_params": params})
+    callbacks = []
+    if usage:
+        callbacks.append(f"{HOOKS}.usage_logger")
     if tracing:
-        settings["callbacks"] = ["generic_api"]   # LiteLLM -> Trajectory webhook, one callback per completion
-    return {
-        "model_list": [{"model_name": s.name,
-                        "litellm_params": {"model": f"openai/{s.model_id}", "api_base": s.url, "api_key": "none"}}
-                       for s in engines],
-        "litellm_settings": settings,
-    }
+        callbacks.append("generic_api")      # LiteLLM -> Trajectory webhook, one callback per completion
+    conf: dict = {"model_list": models, "litellm_settings": {"drop_params": True}}
+    if callbacks:
+        conf["litellm_settings"]["callbacks"] = callbacks
+    if master_key:
+        conf["general_settings"] = {"master_key": master_key, "custom_auth": f"{HOOKS}.user_api_key_auth"}
+    return conf
 
 
 def tracing_env(plat) -> dict[str, str]:
@@ -205,8 +231,9 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
     running = [s for s in read_state(cfg) if alive(s.pid)]
     if running:
         raise UpError(f"already up ({', '.join(s.name for s in running)}); run forge down first")
-    if not plat.components.serving.enabled:
-        raise UpError("components.serving is disabled; nothing to run")
+    hosted = [d for d in cfg.models.values() if d.spec.base]
+    if hosted and not plat.components.serving.enabled:
+        raise UpError("components.serving is disabled, but some Models need an engine")
     if not cfg.models:
         raise UpError("no Model documents to serve")
 
@@ -227,7 +254,10 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             wait_ready(svc, min(timeout, 120.0))
             log(f"ready    tracing: Trajectory collector, lake {tr.lake}")
         taken: set[int] = {plat.gateway.port}
+        providers = [d for d in cfg.models.values() if d.spec.provider]
         for name, doc in cfg.models.items():
+            if doc.spec.provider:
+                continue
             port = doc.spec.serve.port or pick_port(taken)
             taken.add(port)
             live = live_version(cfg, name)
@@ -243,16 +273,21 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             write_state(cfg, services)
             version = f" + {live.tag}" if live else ""
             log(f"starting {name}: {spec.engine} {spec.weights}{version} on :{port}")
+        keystore = KeyStore(storage_dir(cfg))
         for svc in services:
             if svc.kind == "engine":
                 wait_ready(svc, timeout)
+                keystore.engine_started(svc.name, cfg.models[svc.name].spec.serve.costPerHour)
                 log(f"ready    {svc.name}: {svc.url}")
 
         gw = plat.gateway
         if gw.mode == "managed":
             conf = storage_dir(cfg) / "run" / "gateway.yaml"
             engines = [s for s in services if s.kind == "engine"]
-            conf.write_text(yaml.safe_dump(gateway_config(engines, tracing), sort_keys=False))
+            master = keystore.master_key() if gw.auth == "keys" else None
+            conf.write_text(yaml.safe_dump(gateway_config(engines, tracing, providers, master, usage=True),
+                                           sort_keys=False))
+            os.chmod(conf, 0o600)            # holds the master key
             host = "127.0.0.1"
             if gw.command:
                 argv = shlex.split(gw.command.format(config=conf, port=gw.port, host=host))
@@ -263,7 +298,7 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
                 argv = [exe, "--config", str(conf), "--host", host, "--port", str(gw.port)]
             if not port_free(gw.port):
                 raise UpError(f"gateway port {gw.port} is busy; set gateway.port")
-            env = tracing_env(plat) if tracing else None
+            env = {"FORGE_STORAGE": str(storage_dir(cfg)), **(tracing_env(plat) if tracing else {})}
             svc = Service("gateway", "gateway", start(argv, logs / "gateway.log", env), gw.port,
                           f"http://{host}:{gw.port}/v1", f"http://{host}:{gw.port}/health/liveliness",
                           str(logs / "gateway.log"), argv)
@@ -276,8 +311,8 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             log(f"ready    gateway: {svc.url}")
         elif gw.mode == "external":
             snippet = storage_dir(cfg) / "run" / "gateway-models.yaml"
-            snippet.write_text(yaml.safe_dump(gateway_config([s for s in services if s.kind == "engine"], tracing),
-                                              sort_keys=False))
+            snippet.write_text(yaml.safe_dump(gateway_config([s for s in services if s.kind == "engine"], tracing,
+                                                             providers), sort_keys=False))
             log(f"external gateway: add the model_list in {snippet} to your gateway at {gw.url}")
     except BaseException:
         for s in reversed(services):
@@ -318,8 +353,11 @@ def restart_engine(cfg: Config, model: str, timeout: float = 900.0, log=print) -
 
 def down(cfg: Config, log=print) -> int:
     services = read_state(cfg)
+    keystore = KeyStore(storage_dir(cfg)) if services else None
     for s in reversed(services):
         stop(s.pid)
+        if s.kind == "engine" and keystore:
+            keystore.engine_stopped(s.name)
         log(f"stopped  {s.name}")
     state_path(cfg).unlink(missing_ok=True)
     return len(services)
