@@ -28,11 +28,14 @@ flowchart TB
 | `command` | `- command: { run: "python bench.py --base-url {base_url} --model {model} --out {output}" }` | rollout | Any harness that writes JSONL `{"item_id", "score", "passed"?, "slice"?, "error"?}` |
 | `plugin` | `- plugin: { use: acme.check, ...params }` | either | An installed package (see [plugins](plugins.md)) |
 | `ookami/structural` | `- ookami/structural` | row | **Shape only:** tool name exists, tool arguments match the schema, JSON output parses and matches `json_schema`. Labelled as such in reports |
-| `lm-eval`, `inspect` | in the schema | rollout | Planned |
+| `inspect` | `- inspect: { task: evals/arithmetic.py, limit: 50, epochs: 1 }` | rollout | An [Inspect](https://inspect.aisi.org.uk/) task file or registry task, run against the target as an OpenAI-compatible provider. `C`/`I`/`P` scores map to 1/0/0.5 |
+| `lm-eval` | `- lm-eval: { tasks: [gsm8k], limit: 100, filter: strict-match }` | rollout | [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness) tasks through `local-chat-completions`; one metric (default `exact_match`/`acc`) and one filter per task |
 
 - **Row evaluators:** Ookami produces the outputs itself, by calling the target with each held-out row (`eval.generation` sets max tokens and temperature), or by reading recorded outputs.
 - **Rollout evaluators:** these drive the model themselves and define their own items. Several attempts per item (trials) are averaged.
 - **Non-gating evaluators:** an evaluator with `gate: false` is reported but doesn't block promotion.
+
+**How harnesses run:** Inspect and lm-eval run through `uvx`, each in its own environment. Inspect needs `openai>=3.1`, while the gateway's LiteLLM needs `openai<3`, so they can't share Ookami's environment. To use your own installs, set `OOKAMI_INSPECT_CMD` or `OOKAMI_LM_EVAL_CMD`.
 
 ## Splits
 

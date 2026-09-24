@@ -23,6 +23,18 @@ Optional extras:
 | `ookami[parquet]` | Parquet data sources |
 | `ookami[hf]` | Hugging Face data sources |
 
+## 0. The fastest path
+
+```bash
+ookami init                       # writes ookami.yaml for this machine
+ookami up
+export OOKAMI_API_KEY=$(ookami keys master)
+curl localhost:4000/v1/chat/completions -H "Authorization: Bearer $OOKAMI_API_KEY" \
+  -H 'Content-Type: application/json' -d '{"model": "local", "messages": [{"role": "user", "content": "hi"}]}'
+```
+
+On an M3 Max with the model already downloaded, this took **10 seconds** from `init` to the first reply.
+
 ## 1. Serve an open model
 
 ```yaml
@@ -44,8 +56,8 @@ spec:
 ```bash
 ookami validate                   # checks the file; errors and warnings, all at once
 ookami up                         # engine + gateway in the background
-curl localhost:4000/v1/chat/completions -H 'Content-Type: application/json' \
-  -d '{"model": "qwen-4b", "messages": [{"role": "user", "content": "hi"}]}'
+curl localhost:4000/v1/chat/completions -H "Authorization: Bearer $(ookami keys master)" \
+  -H 'Content-Type: application/json' -d '{"model": "qwen-4b", "messages": [{"role": "user", "content": "hi"}]}'
 ookami status
 ookami down
 ```

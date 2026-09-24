@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+- **Renamed to Ookami:**
+  - package, CLI and import `ookami`;
+  - `ookami.yaml` with `apiVersion: ookami.dev/v1alpha1`;
+  - `OOKAMI_*` environment variables;
+  - `ook-` key prefix.
+- **Gateway auth on by default:**
+  - hashed keys in SQLite (no Postgres), plus a generated master key;
+  - per-key monthly budgets and requests-per-minute limits;
+  - `ookami keys` to manage them.
+- **`ookami usage`:** spend per key or team, with API cost and self-hosted hardware cost (`serve.costPerHour`) split by token share.
+- **API models** (`provider:`) routed next to self-hosted ones.
+- **`ookami init`:** a working config for Apple silicon, NVIDIA or CPU.
+- **New evaluators:** Inspect and lm-evaluation-harness, run in isolated environments via uvx.
+- **Langfuse trace UI** over OpenTelemetry (`observability.langfuse`, `ookami[observability]`).
+- **Security:** requires LiteLLM ≥1.83, since 1.82.7 and 1.82.8 on PyPI were backdoored.
+
 ## 0.2.0 (unreleased)
 
 - **Tracing through Trajectory:**

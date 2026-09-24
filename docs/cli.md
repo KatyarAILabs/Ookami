@@ -9,6 +9,7 @@ Every command reads `ookami.yaml` from the current directory, or from `-f FILE`.
 
 | Command | What it does |
 |---|---|
+| `ookami init [-f FILE] [--with-openai] [--force]` | Writes a working `ookami.yaml` for this machine (MLX on Apple silicon, vLLM on NVIDIA, llama.cpp on CPU) and prints the next steps |
 | `ookami validate [-f FILE]` | Parses every document and reports all errors and warnings at once |
 | `ookami schema` | Prints the JSON Schema for editor autocomplete |
 | `ookami up [-f FILE] [--timeout S]` | Starts one engine per Model (serving its live version if there is one) and the managed gateway, in the background. Waits up to `--timeout` seconds (default 900) for each |
@@ -19,6 +20,9 @@ Every command reads `ookami.yaml` from the current directory, or from `-f FILE`.
 | `ookami jobs [-f FILE] [--logs JOB_ID] [-n LINES]` | Lists training jobs, or prints one job's trainer log |
 | `ookami models [MODEL] [-f FILE]` | Lists versions: status, gate decision, dataset hash, report path |
 | `ookami promote MODEL [VERSION] [-f FILE] [--force --reason TEXT]` | Makes a version live. Default: the newest that passed. Refuses a version that didn't pass unless `--force` with a `--reason`, which is recorded. Restarts the running engine |
+| `ookami keys create NAME [--team T] [--budget USD] [--rpm N]` | Creates a gateway key; prints it once |
+| `ookami keys list` / `revoke NAME` / `master` | Lists keys with this month's spend, revokes one, or prints the master key |
+| `ookami usage [--by key\|team] [--since 30d]` | Spend per key or team: API cost plus self-hosted hardware cost split by tokens |
 | `ookami eval --candidate T --incumbent T [--model M] [-f FILE]` | Runs the Model's evaluators on two targets and applies the gate |
 
 **Eval targets:**

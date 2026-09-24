@@ -45,6 +45,66 @@ The gateway is set by `gateway.mode`:
 - **Where LiteLLM comes from:** the managed gateway needs `ookami[gateway]`. Ookami prefers the LiteLLM installed next to itself over one on `PATH`. A LiteLLM installed without its proxy extras fails to start, and Ookami's error says so.
 - **Stable model ids:** clients send the same model id before and after a new version goes live, so the gateway config doesn't change on promotion.
 
+## Keys, budgets and rate limits
+
+The managed gateway requires a key by default (`gateway.auth: keys`):
+
+```bash
+ookami keys master                                   # admin key, generated on first use
+ookami keys create alice --team research --budget 50 --rpm 120   # shown once; stored only as a hash
+ookami keys list                                     # team, state, spend this month
+ookami keys revoke alice
+```
+
+**How it works:**
+
+| Part | Behaviour |
+|---|---|
+| Keys | Stored as SHA-256 hashes in `<storage>/registry.db`. No Postgres needed |
+| Master key | In `<storage>/secrets/master_key` (mode 0600) |
+| The check | A LiteLLM custom-auth hook decides each call: missing, unknown or revoked key → 401; over `--rpm` in a sliding minute → 429; monthly provider spend at or over `--budget` → 429 (`budget_exceeded`) |
+| Health endpoints | Stay open |
+| `gateway.auth: none` | Turns it off; `ookami validate` warns |
+
+Callers send `Authorization: Bearer <key>`. Ookami's own eval runner, and the harnesses it runs, send `OOKAMI_API_KEY`.
+
+## Usage and cost
+
+Every call is recorded: key, team, model, tokens, provider cost and latency. `ookami usage [--by team] [--since 7d]` reports spend per key or team:
+
+| Column | Where it comes from |
+|---|---|
+| API $ | Provider cost as LiteLLM prices it |
+| Self-hosted $ | Each engine's hardware cost for the period (`serve.costPerHour` × uptime), split across keys by their share of that model's tokens |
+| Per-model line | Self-hosted cost per million tokens, to compare with API prices |
+
+## API models next to self-hosted ones
+
+```yaml
+kind: Model
+metadata: { name: gpt }
+spec:
+  provider: { name: openai, model: gpt-5-mini, apiKey: "${secret:OPENAI_API_KEY}" }
+```
+
+- **What it is:** any LiteLLM provider (`openai`, `anthropic`, `azure`, `bedrock`, `vertex_ai`, ...) routed through the same gateway, with the same keys, budgets and usage.
+- **Secrets:** `${secret:NAME}` reads environment variable `NAME` on the local backend.
+- **Not trainable:** API models can't be trained. Set `base:` to fine-tune an open model.
+
+## Trace UI with Langfuse
+
+```yaml
+kind: Platform
+spec:
+  observability:
+    langfuse: { host: "http://langfuse.internal:3000", publicKey: "${secret:LANGFUSE_PUBLIC_KEY}", secretKey: "${secret:LANGFUSE_SECRET_KEY}" }
+```
+
+- **What happens:** the gateway sends every call to Langfuse over OpenTelemetry, through LiteLLM's `langfuse_otel` callback.
+- **Install:** needs `ookami[observability]`.
+- **If Langfuse is down:** calls still succeed.
+- **How it relates to Trajectory:** Langfuse is for people browsing traces; Trajectory (below) is for training data. They run side by side.
+
 ## Tracing with Trajectory
 
 With `components.tracing` enabled and `Platform.tracing` set:

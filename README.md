@@ -18,15 +18,13 @@ spec:
   base: gpt-oss-20b
 ```
 
-> **Status: 0.2, early.** What works today, on one machine:
-> - `ookami up` / `status` / `logs` / `down`: open models served by vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, behind a managed LiteLLM gateway;
-> - `ookami train`: versioned data snapshot, memory-planned LoRA fine-tune (MLX or TRL), one job at a time, checkpoints and resume, then an automatic gate against the live version;
-> - `ookami models` / `promote`: a registry that refuses to put a version live unless it passed its gate;
-> - `ookami eval` with your own evaluators or plugins.
+> **Status: 0.3, early.** What works today, on one machine:
+> - `ookami init` → `ookami up`: open models on vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, plus API models, behind one gateway with **auth on by default** (keys, budgets, rate limits);
+> - `ookami usage`: spend per key or team, API and self-hosted;
+> - `ookami train` → gate → `promote`: LoRA fine-tuning gated against the live version by your evaluators, including Inspect and lm-eval;
+> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory), and a Langfuse trace UI.
 >
-> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory): the managed gateway sends every call to the collector, and `data.source.traces` trains on its lake.
->
-> Gateway hand-off (shadow/canary/rollback) and GRPO are next. See [docs/plan.md](docs/plan.md).
+> Gateway hand-off (shadow/canary/rollback), Kubernetes and GPU efficiency are next. See [docs/plan.md](docs/plan.md).
 
 ## Quickstart: fine-tune, gate and serve on one machine
 
