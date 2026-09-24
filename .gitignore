@@ -4,3 +4,5 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 examples/**/tickets.jsonl
+deploy/aws-gpu/.state
+deploy/aws-gpu/last-run.log
