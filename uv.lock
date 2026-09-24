@@ -1035,7 +1035,7 @@ requires-dist = [
     { name = "bitsandbytes", marker = "extra == 'train-cuda'", specifier = ">=0.45" },
     { name = "datasets", marker = "extra == 'hf'", specifier = ">=3" },
     { name = "datasets", marker = "extra == 'train-cuda'", specifier = ">=3" },
-    { name = "litellm", extras = ["proxy"], marker = "extra == 'gateway'", specifier = ">=1.80" },
+    { name = "litellm", extras = ["proxy"], marker = "extra == 'gateway'", specifier = ">=1.83,<2" },
     { name = "peft", marker = "extra == 'train-cuda'", specifier = ">=0.15" },
     { name = "pyarrow", marker = "extra == 'parquet'", specifier = ">=15" },
     { name = "pydantic", specifier = ">=2.6" },
