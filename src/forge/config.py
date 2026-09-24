@@ -58,10 +58,12 @@ class Metadata(Strict):
 # ---------------------------------------------------------------- Platform
 
 class Storage(Strict):
+    """Where datasets, checkpoints, adapters, reports and the registry live."""
     uri: str = Field(description="s3://, gs://, az://, file:// or a local path")
 
 
 class Database(Strict):
+    """State database. SQLite in storage for the local backend; Postgres on k8s."""
     url: str | None = Field(None, description="Postgres URL (a secret reference) or sqlite:///path; default SQLite in storage")
 
     @field_validator("url")
@@ -73,11 +75,12 @@ class Database(Strict):
 
 
 class Gateway(Strict):
+    """The OpenAI-compatible gateway in front of every model."""
     mode: Literal["managed", "external", "none"] = Field(
         "managed", description="managed: forge runs the gateway; external: use yours; none: no gateway")
-    type: Literal["litellm", "agent-router"] = "litellm"
-    url: str | None = None
-    adminKey: str | None = None
+    type: Literal["litellm", "agent-router"] = Field("litellm", description="gateway implementation")
+    url: str | None = Field(None, description="required for an external gateway")
+    adminKey: str | None = Field(None, description="secret reference for the gateway's admin API")
     port: int = Field(4000, ge=1, le=65535, description="managed gateway port")
     command: str | None = Field(None, description="advanced: launch template for a managed gateway, "
                                                   "with {config} {port} {host}")
@@ -95,46 +98,51 @@ class Gateway(Strict):
 
 
 class Component(Strict):
-    enabled: bool = True
+    """Turn a component on or off."""
+    enabled: bool = Field(True, description="run this component")
 
 
 class Components(Strict):
     """Switch on what you need. Each component also works on its own."""
-    serving: Component = Component()                  # vLLM, multi-LoRA, scale-to-zero
-    training: Component = Component()                 # one-job queue, SFT / DPO / GRPO
-    eval: Component = Component()                     # held-out sets, gate, reports
-    registry: Component = Component()                 # models, adapters, lineage
-    tracing: Component = Component(enabled=False)     # OTel collector: gateway traffic -> your bucket
-    console: Component = Component(enabled=False)     # web UI
+    serving: Component = Field(Component(), description="inference engines (vLLM, MLX or a command); on by default")
+    training: Component = Field(Component(), description="fine-tuning queue and trainers; on by default")
+    eval: Component = Field(Component(), description="held-out sets, the promotion gate, reports; on by default")
+    registry: Component = Field(Component(), description="versions, gate decisions, promotions; on by default")
+    tracing: Component = Field(Component(enabled=False), description="capture gateway traffic into storage (planned); off by default")
+    console: Component = Field(Component(enabled=False), description="web UI (planned); off by default")
 
 
 class TrainingCompute(Strict):
-    gpu: str = "auto"
-    count: int = Field(1, ge=1)
-    capacity: list[Literal["spot", "on-demand", "reserved"]] = ["spot", "on-demand"]
-    budgetHoursPerWeek: float | None = Field(None, gt=0)
+    """Compute for training jobs."""
+    gpu: str = Field("auto", description="GPU type for training nodes (cloud backends)")
+    count: int = Field(1, ge=1, description="GPUs per training job")
+    capacity: list[Literal["spot", "on-demand", "reserved"]] = Field(["spot", "on-demand"], description="capacity types to try, in order")
+    budgetHoursPerWeek: float | None = Field(None, gt=0, description="GPU-hour budget the queue schedules within (planned)")
 
 
 class ServingCompute(Strict):
-    gpu: str = "auto"
-    scaleToZero: bool = True
-    coldFallback: Literal["incumbent", "error"] = "incumbent"
+    """Compute for inference engines."""
+    gpu: str = Field("auto", description="GPU type for serving nodes (cloud backends)")
+    scaleToZero: bool = Field(True, description="scale engines to zero when idle (k8s, planned)")
+    coldFallback: Literal["incumbent", "error"] = Field("incumbent", description="what the gateway does while a model is cold (planned)")
 
 
 class Compute(Strict):
-    profile: Literal["local", "vm", "cloud-eks", "cloud-gke", "cloud-aks", "onprem"] = "local"
+    """What compute to use and where it comes from."""
+    profile: Literal["local", "vm", "cloud-eks", "cloud-gke", "cloud-aks", "onprem"] = Field(
+        "local", description="where compute comes from; picks the autoscaler wiring on k8s")
     training: TrainingCompute = TrainingCompute()
     serving: ServingCompute = ServingCompute()
 
 
 class PlatformSpec(Strict):
-    backend: Literal["local", "k8s", "skypilot"] = "local"
+    backend: Literal["local", "k8s", "skypilot"] = Field("local", description="local runs on this machine; k8s and skypilot are planned")
     storage: Storage
     database: Database = Database()
     gateway: Gateway = Gateway()
     components: Components = Components()
     compute: Compute = Compute()
-    telemetry: Literal["off", "on"] = "off"
+    telemetry: Literal["off", "on"] = Field("off", description="opt-in usage telemetry (none is sent today)")
 
     @model_validator(mode="after")
     def _backend_fits(self) -> "PlatformSpec":
@@ -151,11 +159,12 @@ class PlatformSpec(Strict):
 # ---------------------------------------------------------------- Model
 
 class DataSource(Strict):
-    jsonl: str | None = None
-    parquet: str | None = None
+    """Where a Model's data comes from. Set exactly one of jsonl, parquet, hf, traces."""
+    jsonl: str | None = Field(None, description="path to a JSONL file: rows with messages, input or prompt; optional label")
+    parquet: str | None = Field(None, description="path to a Parquet file or directory (needs forge-ml[parquet])")
     hf: str | None = Field(None, description="Hugging Face dataset id")
     traces: Literal["gateway"] | None = Field(None, description="traffic captured by the tracing component")
-    match: dict[str, str] = {}
+    match: dict[str, str] = Field({}, description="filter for traces sources, e.g. {route: /support}")
 
     @model_validator(mode="after")
     def _one(self) -> "DataSource":
@@ -166,17 +175,19 @@ class DataSource(Strict):
 
 
 class Data(Strict):
+    """Training and evaluation data."""
     source: DataSource
-    minExamples: int = Field(500, ge=1)
+    minExamples: int = Field(500, ge=1, description="training refuses to start with fewer training rows")
 
 
 class Train(Strict):
+    """How to fine-tune. The memory planner fills in everything not overridden."""
     engine: Literal["auto", "mlx", "trl", "command"] = Field(
         "auto", description="auto: trl on NVIDIA GPUs, mlx on Apple silicon; command: your own trainer")
     command: str | None = Field(None, description="engine command: template with {job} (path to job.json)")
-    recipe: Literal["sft", "dpo", "grpo", "sft-then-grpo"] = "sft"
+    recipe: Literal["sft", "dpo", "grpo", "sft-then-grpo"] = Field("sft", description="sft today; dpo and grpo are planned")
     reward: str | None = Field(None, description="python evaluator ref used as the RL reward, e.g. ./evals/reward.py:score")
-    overrides: dict[str, Any] = {}
+    overrides: dict[str, Any] = Field({}, description="planner overrides: " + ", ".join(sorted(OVERRIDABLE)))
 
     @model_validator(mode="after")
     def _check(self) -> "Train":
@@ -191,10 +202,11 @@ class Train(Strict):
 
 
 class Splits(Strict):
-    heldOut: float = Field(0.1, gt=0, lt=1)
-    audit: float = Field(0.05, ge=0, lt=1)
-    stratifyBy: list[str] = []
-    seed: int = 0
+    """Hash-based splits: a row never changes split as data grows, and duplicate inputs share a split."""
+    heldOut: float = Field(0.1, gt=0, lt=1, description="share of rows reserved for the gate, never trained on")
+    audit: float = Field(0.05, ge=0, lt=1, description="second reserved share, never used for training or RL reward")
+    stratifyBy: list[str] = Field([], description="row fields to report and gate per slice")
+    seed: int = Field(0, description="changes which rows land in which split")
     refreshAfter: str | None = Field(None, description="e.g. 30d; a refresh creates a new split version")
 
     @model_validator(mode="after")
@@ -205,10 +217,11 @@ class Splits(Strict):
 
 
 class EvaluatorSpec(Strict):
-    kind: Literal[EVALUATOR_KINDS]  # type: ignore[valid-type]
-    params: dict[str, Any] = {}
-    name: str
-    gate: bool = True
+    """One evaluator: labels, python, webhook, command, plugin, structural (lm-eval, inspect planned)."""
+    kind: Literal[EVALUATOR_KINDS] = Field(description="written as the single key, e.g. `- labels: {column: x}`")  # type: ignore[valid-type]
+    params: dict[str, Any] = Field({}, description="the value under the kind key")
+    name: str = Field(description="defaults from the kind; must be unique per Model")
+    gate: bool = Field(True, description="false: reported only, does not block promotion")
 
     @model_validator(mode="before")
     @classmethod
@@ -251,14 +264,16 @@ class EvaluatorSpec(Strict):
 
 
 class Gate(Strict):
-    vs: Literal["incumbent"] = "incumbent"
-    test: Literal["non-inferiority", "superiority", "threshold"] = "non-inferiority"
+    """The promotion test: candidate vs incumbent, paired by item."""
+    vs: Literal["incumbent"] = Field("incumbent", description="the live version, or the base model when nothing is live")
+    test: Literal["non-inferiority", "superiority", "threshold"] = Field(
+        "non-inferiority", description="no worse by more than margin / better than / candidate mean above min")
     margin: float = Field(-0.01, le=0, description="largest drop vs the incumbent we accept")
-    confidence: float = Field(0.95, gt=0.5, lt=1)
-    perSlice: bool = True
+    confidence: float = Field(0.95, gt=0.5, lt=1, description="one-sided bootstrap confidence")
+    perSlice: bool = Field(True, description="also judge each stratifyBy slice")
     min: float | None = Field(None, description="absolute floor for the candidate's mean score")
     minItems: int = Field(20, ge=1, description="fewer paired items than this and the gate cannot pass")
-    resamples: int = Field(10000, ge=1000)
+    resamples: int = Field(10000, ge=1000, description="bootstrap resamples")
 
     @model_validator(mode="after")
     def _threshold(self) -> "Gate":
@@ -268,14 +283,16 @@ class Gate(Strict):
 
 
 class Generation(Strict):
-    maxTokens: int = Field(1024, ge=1)
-    temperature: float = Field(0.0, ge=0)
+    """Generation settings when Forge produces outputs for row evaluators."""
+    maxTokens: int = Field(1024, ge=1, description="max tokens per eval generation")
+    temperature: float = Field(0.0, ge=0, description="sampling temperature for eval generations")
 
 
 class Eval(Strict):
+    """Evaluators, splits and the gate."""
     splits: Splits = Splits()
     generation: Generation = Generation()
-    evaluators: list[EvaluatorSpec] = Field(min_length=1)
+    evaluators: list[EvaluatorSpec] = Field(min_length=1, description="at least one must gate")
     gate: Gate = Gate()
 
     @model_validator(mode="after")
@@ -290,20 +307,23 @@ class Eval(Strict):
 
 
 class RouteMatch(Strict):
+    """The gateway route a Model takes over."""
     model: str = Field(description="the model name agents call today, as the gateway sees it")
-    match: dict[str, str] = {}
+    match: dict[str, str] = Field({}, description="request attributes that select the route")
 
 
 class Rollback(Strict):
-    metric: str
-    below: float
-    window: str = "1h"
+    """Automatic rollback rule (planned)."""
+    metric: str = Field(description="an evaluator name")
+    below: float = Field(description="roll back when the metric stays below this")
+    window: str = Field("1h", description="how long it must stay below")
 
 
 class Handoff(Strict):
-    route: RouteMatch | None = None
-    stages: list[str] = ["shadow", "canary:10%", "live"]
-    approve: list[Literal["shadow", "canary", "live"]] = ["live"]
+    """Moving gateway traffic to the model: shadow, canary, live, rollback (planned)."""
+    route: RouteMatch | None = Field(None, description="the gateway route this model takes over (hand-off is planned)")
+    stages: list[str] = Field(["shadow", "canary:10%", "live"], description="shadow, canary:N% ascending, ending with live")
+    approve: list[Literal["shadow", "canary", "live"]] = Field(["live"], description="stages that need a human")
     rollback: Rollback | None = None
     shadowExecutor: str | None = Field(None, description="python ref that replays side-effecting calls in a sandbox")
 
@@ -327,12 +347,13 @@ class Handoff(Strict):
 
 
 class Serve(Strict):
+    """How the model is served."""
     engine: Literal["auto", "vllm", "mlx", "command"] = Field(
         "auto", description="auto: vllm on NVIDIA GPUs, mlx on Apple silicon; command: any OpenAI-compatible server")
     command: str | None = Field(None, description="engine command: launch template with {weights} {port} {host} {name}")
     modelId: str | None = Field(None, description="engine command: the model id the server expects in requests")
-    port: int | None = Field(None, ge=1, le=65535)
-    host: str = "127.0.0.1"
+    port: int | None = Field(None, ge=1, le=65535, description="engine port; default: first free from 8100")
+    host: str = Field("127.0.0.1", description="bind address for the engine")
     args: list[str] = Field([], description="extra engine flags, e.g. [--max-model-len, '8192']")
 
     @model_validator(mode="after")
@@ -347,10 +368,10 @@ class ModelSpec(Strict):
     licence: str | None = Field(None, description="required when base is not in forge's catalog")
     weights: str | None = Field(None, description="Hugging Face id or local path; defaults to the catalog's")
     serve: Serve = Serve()
-    data: Data | None = None
-    train: Train | None = None
-    eval: Eval | None = None
-    handoff: Handoff = Handoff()
+    data: Data | None = Field(None, description="training and row-eval data; needed for train")
+    train: Train | None = Field(None, description="omit to only serve the base model")
+    eval: Eval | None = Field(None, description="required when train is set")
+    handoff: Handoff = Field(Handoff(), description="gateway hand-off (planned)")
 
     @model_validator(mode="after")
     def _check(self) -> "ModelSpec":
