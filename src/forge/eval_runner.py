@@ -86,8 +86,10 @@ def run_eval(cfg: Config, model: str, candidate: Target, incumbent: Target) -> R
         chosen = [x for x in examples if split_of[x.id] != "train"]
         if not chosen:
             raise ValueError("no held-out or audit rows; the dataset is too small for these split fractions")
+        all_outs: dict[str, dict[str, Any]] = {}
         for target in (candidate, incumbent):
-            outs = data.outputs_for(target, chosen)
+            outs = all_outs[target.label] = data.outputs_for(target, chosen, max_tokens=ev_cfg.generation.maxTokens,
+                                                             temperature=ev_cfg.generation.temperature)
             missing = [x.id for x in chosen if x.id not in outs]
             if missing:
                 notes.append(f"{target.label}: no output for {len(missing)} of {len(chosen)} rows")
@@ -98,6 +100,11 @@ def run_eval(cfg: Config, model: str, candidate: Target, incumbent: Target) -> R
                     sl = {k: str(x.meta.get(k, "?")) for k in ev_cfg.splits.stratifyBy}
                     obs[spec_e.name][split_of[x.id]].setdefault(target.label, []).append(
                         Observation(x.id, e.score(x, outs[x.id]), sl))
+
+        same = _identical_share(all_outs.get(candidate.label, {}), all_outs.get(incumbent.label, {}))
+        if same is not None and same >= 0.95:
+            notes.append(f"candidate and incumbent gave identical outputs on {same:.0%} of rows: check that the "
+                         "candidate endpoint really serves the trained weights")
 
     for spec_e, e in evaluators:
         if isinstance(e, RolloutEvaluator):
@@ -140,6 +147,13 @@ def run_eval(cfg: Config, model: str, candidate: Target, incumbent: Target) -> R
     ev_meta = [{"name": s.name, "kind": s.kind, "version": getattr(e, "version", "1"), "gate": str(s.gate)}
                for s, e in evaluators]
     return Report(model, decision, candidate.describe(), incumbent.describe(), results, info, ev_meta, notes, provenance)
+
+
+def _identical_share(a: dict[str, Any], b: dict[str, Any]) -> float | None:
+    common = [k for k in a if k in b]
+    if len(common) < 10:
+        return None
+    return sum(json.dumps(a[k], sort_keys=True) == json.dumps(b[k], sort_keys=True) for k in common) / len(common)
 
 
 def _item_means(observations: list[Observation]) -> dict[str, tuple[float, str]]:

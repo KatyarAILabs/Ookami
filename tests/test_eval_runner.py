@@ -35,6 +35,7 @@ def test_row_eval_pass_and_per_slice_block(write, tmp_path):
     inc = Target.parse(f"results:{tmp_path / 'inc.jsonl'}", "incumbent")
     same = run_eval(cfg, "m", Target.parse(f"results:{tmp_path / 'inc.jsonl'}", "candidate"), inc)
     assert same.decision == "pass"
+    assert any("identical outputs" in n for n in same.notes)
     assert {r.split for r in same.results} == {"heldOut", "audit"}
     worse = run_eval(cfg, "m", Target.parse(f"results:{tmp_path / 'bad.jsonl'}", "candidate"), inc)
     assert worse.decision == "fail"
