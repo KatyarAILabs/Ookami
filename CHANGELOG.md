@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.0 (2026-09-25)
 
 - **Renamed to Ookami:**
   - package, CLI and import `ookami`;

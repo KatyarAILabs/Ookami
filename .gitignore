@@ -6,3 +6,4 @@ __pycache__/
 examples/**/tickets.jsonl
 deploy/aws-gpu/.state
 deploy/aws-gpu/last-run.log
+.DS_Store

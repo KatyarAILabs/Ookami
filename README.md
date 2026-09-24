@@ -1,121 +1,148 @@
-# Ookami
+<p align="center"><img src="docs/images/banner.jpg" alt="Ookami: open-source AI infrastructure stack"></p>
 
-![Ookami: self-hosted AI infrastructure in one package](docs/images/banner.png)
+<p align="center">
+  <strong>Run open models and API models behind one secure gateway, fine-tune them on your data,<br>
+  and promote a new version only when it beats the live one on your own evals. Self-hosted, one config file.</strong>
+</p>
 
-**Open-source, self-hosted AI infrastructure in one package.** Gateway, model serving, fine-tuning, eval gates, model registry, trace capture and GPU autoscaling ship as one install and are driven by one config file. You switch on only what you need. It runs on one GPU box, on any Kubernetes cluster, in your cloud account, or air-gapped.
+<p align="center">
+  <a href="https://github.com/KatyarAILabs/Ookami/actions/workflows/ci.yml"><img src="https://github.com/KatyarAILabs/Ookami/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/status-alpha%20(v0.3)-orange" alt="Alpha">
+</p>
 
-```yaml
-# ookami.yaml: serve an open model on your GPU behind an OpenAI-compatible gateway
-apiVersion: ookami.dev/v1alpha1
-kind: Platform
-metadata: { name: my-box }
-spec:
-  storage: { uri: ./.ookami }
-  components: { training: { enabled: false } }
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="docs/getting-started.md">Docs</a> ·
+  <a href="docs/console.md">Console</a> ·
+  <a href="docs/verification.md">What's verified</a> ·
+  <a href="docs/plan.md">Roadmap</a>
+</p>
+
 ---
-apiVersion: ookami.dev/v1alpha1
-kind: Model
-metadata: { name: gpt-oss }
-spec:
-  base: gpt-oss-20b
+
+## Why Ookami
+
+Running open models in production today means stitching together a gateway, an inference server, a fine-tuning stack, eval tooling, a model registry and trace capture, then keeping them all secure and upgraded. The open pieces are excellent but separate. The products that joined them up were acquired, closed, or tied to one cloud or GPU vendor.
+
+Ookami ships those pieces as **one install, driven by one `ookami.yaml`**, on hardware you control:
+
+- **One gateway for everything.** Self-hosted models (vLLM, MLX, llama.cpp) and API models (OpenAI, Anthropic, Bedrock…) sit behind one OpenAI-compatible endpoint. **Auth is on by default**, with per-key budgets and rate limits.
+- **Know what it costs.** Spend per key or team, with API cost and self-hosted GPU cost side by side, and cost per million tokens for your own models.
+- **Fine-tune on your data.** LoRA on Apple silicon (MLX) or NVIDIA (TRL). A memory planner picks the settings; jobs run one at a time and resume from checkpoints.
+- **Promote only what's better.** Every trained version is gated against the live one on frozen held-out and audit splits, with paired bootstrap statistics. **You bring the evaluators**, from labels and Python checks to Inspect, lm-eval, or any benchmark command.
+- **Close the loop.** Capture gateway traffic with [Trajectory](https://github.com/KatyarAILabs/trajectory), train on the episodes that went well, and put the result back behind the same gateway.
+- **See it all.** A web console for models, versions, training jobs, keys, usage and a playground.
+
+## Quickstart
+
+```bash
+pip install "ookami[gateway] @ git+https://github.com/KatyarAILabs/Ookami.git"
+pip install mlx-lm        # Apple silicon;  on NVIDIA: pip install vllm
+
+ookami init               # writes ookami.yaml for this machine
+ookami up                 # model + gateway (+ console, if enabled)
+export OOKAMI_API_KEY=$(ookami keys master)
+curl localhost:4000/v1/chat/completions -H "Authorization: Bearer $OOKAMI_API_KEY" \
+  -H 'Content-Type: application/json' -d '{"model": "local", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-> **Status: 0.3, early.** Verified on Apple silicon (MLX) and NVIDIA (A10G: vLLM + TRL). What works today, on one machine:
-> - `ookami init` → `ookami up`: open models on vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, plus API models, behind one gateway with **auth on by default** (keys, budgets, rate limits);
-> - `ookami usage`: spend per key or team, API and self-hosted;
-> - `ookami train` → gate → `promote`: LoRA fine-tuning gated against the live version by your evaluators, including Inspect and lm-eval;
-> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory), and a Langfuse trace UI;
-> - a web [console](docs/console.md) for models, training, keys, usage and a playground.
->
-> Gateway hand-off (shadow/canary/rollback), Kubernetes and GPU efficiency are next. See [docs/plan.md](docs/plan.md).
+On an M3 Max, with the model already downloaded, `init` to the first authenticated reply took **10 seconds**.
 
-## Quickstart: fine-tune, gate and serve on one machine
+## Fine-tune, gate and serve in one sitting
+
+The [ticket-routing example](examples/ticket-routing) teaches a model queue codes that a base model can't know:
 
 ```bash
 cd examples/ticket-routing && python make_data.py > tickets.jsonl
-ookami train router        # snapshot -> LoRA -> gate vs the base model
-ookami promote router      # refused unless the gate passed
-ookami up                  # serves the live version behind the gateway on :4000
+ookami train router       # snapshot → LoRA → gate against the base model
+ookami promote router     # refused unless the gate passed
+ookami up                 # the trained version, behind the gateway
 ```
 
-On an M3 Max, `ookami train` took about 6 minutes (Qwen3-4B, 4-bit, 2 epochs). The gate scored the trained version at 82% on held-out rows and 93% on audit rows, against 0% for the base model; the queue codes are made up, so the base can't know them.
+| Hardware | Model | Training | Gate: trained vs base (held-out / audit) |
+|---|---|---|---|
+| Apple M3 Max (MLX) | Qwen3-4B, 4-bit LoRA | ~5 min | **82% / 93%** vs 0% / 0% |
+| NVIDIA A10G (TRL + vLLM) | Qwen2.5-1.5B, 16-bit LoRA | < 1 min | **100% / 100%** vs 0% / 0% |
 
-![Ookami console](docs/images/console-overview.png)
+The gate also *rejects*. On the Mac, an undertrained first version and a version with a serving bug were both blocked, and `ookami promote` refused them.
+
+## Console
+
+<p align="center"><img src="docs/images/console-overview.png" alt="Ookami console: overview"></p>
+
+Set `components.console.enabled: true`, or run `ookami console`. Sign in with `ookami keys master`. The console has:
+- models and versions, with gate reports, promotion and history;
+- training jobs, with live logs;
+- keys, budgets, usage and cost;
+- a playground.
+
+It's built on the Python standard library with three static files: no build step and no external assets, so it works air-gapped. [More](docs/console.md).
 
 ## How it fits together
 
 ```mermaid
 flowchart LR
-    app["your apps"] -->|"OpenAI API"| gw["gateway"]
-    gw --> eng["engines<br/>your GPUs"]
-    gw -.-> traj["Trajectory<br/>capture"]
-    traj -.-> data[("data")]
-    data --> train["fine-tune"] --> gate{"gate<br/>your evals"}
-    gate -->|"pass + promote"| eng
+    app["your apps"] -->|"OpenAI API + key"| gw["gateway<br/>auth · budgets · usage"]
+    gw --> eng["your models<br/>vLLM · MLX · llama.cpp"]
+    gw --> api["API models<br/>OpenAI · Anthropic · …"]
+    gw -.->|"traces"| traj["Trajectory"]
+    traj -.-> data[("training data")]
+    data --> train["fine-tune<br/>LoRA"] --> gate{"gate<br/>your evals"}
+    gate -->|"pass → promote"| eng
 ```
 
-## Components
+## What works today
 
-| Component | Default | Built on |
-|---|---|---|
-| gateway | managed (or `external`: bring your own) | LiteLLM / Agent Router |
-| serving | on | vLLM multi-LoRA, KEDA scale-to-zero |
-| training | on | TRL (SFT/DPO), prime-rl (GRPO), Kueue |
-| eval | on | Ookami gate + your evaluators |
-| registry | on | Postgres + your bucket |
-| tracing | off | [Trajectory](https://github.com/KatyarAILabs/trajectory): gateway callbacks → redacted Parquet lake |
-| console | off | Ookami's web UI (standard library, no build step) |
+| | Status |
+|---|---|
+| Gateway: self-hosted + API models, keys, budgets, rate limits, usage and cost | ✅ |
+| Serving: vLLM (NVIDIA), MLX (Apple silicon), any OpenAI-compatible server | ✅ |
+| Fine-tuning: LoRA with MLX or TRL, memory planner, job queue, checkpoints | ✅ |
+| Eval gate: labels, Python, webhook, command, Inspect, lm-eval, plugins | ✅ |
+| Registry: versions, gate decisions, promotion rules, audit events | ✅ |
+| Tracing via Trajectory; Langfuse trace UI | ✅ |
+| Web console | ✅ |
+| `ookami init` for Apple silicon, NVIDIA or CPU | ✅ |
+| Gateway hand-off: shadow → canary → live, automatic rollback | 🛠 next (0.4) |
+| RL (GRPO) | 🛠 0.4 |
+| Kubernetes backend: operator, Helm, llm-d, Kueue, free SSO/RBAC | 🛠 0.5 |
+| GPU efficiency: scale-to-zero, fractional GPUs, cache-aware routing | 🛠 0.6 |
+| MCP gateway, agent sandboxes, guardrails, air-gapped bundle | 🛠 0.7 |
 
-## Try it
+**Verified on real hardware:**
+- Apple M3 Max (MLX);
+- NVIDIA A10G on AWS (vLLM + TRL);
+- a Kubernetes pod on AKS (CPU, llama.cpp).
 
-```bash
-uv sync --extra gateway                              # or: pip install 'ookami[gateway]'
-# engines are installed separately: pip install vllm (NVIDIA) or pip install mlx-lm (Apple silicon)
-uv run ookami up -f examples/serve-only.yaml           # model + gateway on this machine
-curl localhost:4000/v1/chat/completions -H 'Content-Type: application/json' \
-  -d '{"model": "gpt-oss", "messages": [{"role": "user", "content": "hi"}]}'
-uv run ookami down -f examples/serve-only.yaml
+Every run, including the bugs each one found, is in the [verification log](docs/verification.md). Today everything runs on **one machine**; the Kubernetes backend is next.
 
-uv run ookami validate -f examples/ookami.yaml          # full loop on EKS
-uv run ookami validate -f examples/serve-only.yaml     # one GPU box
-uv run ookami schema > ookami.schema.json               # editor autocomplete
-
-# Gate two OpenAI-compatible endpoints on your own benchmark:
-uv run ookami eval -f examples/benchmark.yaml \
-  --candidate openai:http://localhost:8000/v1#my-finetune \
-  --incumbent openai:http://localhost:8001/v1#base-model
-uv run pytest
-```
-
-## Evaluation: you bring the judgement, Ookami brings the statistics
-
-- **Evaluators:**
-  - `labels`: a column in your data;
-  - `python`: a function decorated with `@evaluator`;
-  - `webhook`;
-  - `command`: any harness that writes `{"item_id", "score"}` JSONL;
-  - `plugin`: evaluators shipped as separate packages through the `ookami.evaluators` entry point;
-  - `lm-eval` and `inspect`: planned;
-  - `ookami/structural`: JSON and tool-call shape only.
-- **What Ookami adds:**
-  - frozen held-out and audit splits (duplicates never straddle splits);
-  - paired bootstrap confidence intervals per slice;
-  - non-inferiority, superiority and threshold tests;
-  - a report for every run.
-- **Exit codes:** `0` means the gate passed, `3` means it did not pass, `1` means an error. This makes it drop-in for CI.
-- **Built-in warnings:**
-  - the RL reward is reused as a gate;
-  - the gate uses structural checks alone;
-  - shadow mode on multi-turn agents with side effects.
+## Bring your own evaluators
 
 ```python
 from ookami import Score, evaluator
 
-@evaluator(name="task_check", version="2")
+@evaluator(name="refund_posted", version="1")
 def score(example, output) -> Score:
     ok = output["content"].strip() == example.label
     return Score(float(ok), passed=ok)
 ```
+
+```yaml
+eval:
+  evaluators:
+    - python: ./evals/refund.py:score
+    - inspect: { task: evals/arithmetic.py }
+    - lm-eval: { tasks: [gsm8k], limit: 100 }
+  gate: { vs: incumbent, test: non-inferiority, margin: -0.01, confidence: 0.95 }
+```
+
+**Built-in guardrails:**
+- `ookami validate` warns when the RL reward is also a gate evaluator;
+- it warns when the gate uses structural checks only;
+- reports warn when candidate and incumbent outputs are identical, a sign the trained weights aren't what's being served;
+- `ookami eval` exits `3` when the gate fails, so it drops straight into CI.
 
 ## Documentation
 
@@ -124,8 +151,16 @@ def score(example, output) -> Score:
 | [Getting started](docs/getting-started.md) | Install, serve, fine-tune, put live |
 | [Architecture](docs/architecture.md) | Components, interfaces, lifecycle, on-disk layout |
 | [ookami.yaml reference](docs/reference/ookami-yaml.md) | Every field, generated from the code |
-| [CLI](docs/cli.md) · [Serving](docs/serving.md) · [Training](docs/training.md) · [Evaluation](docs/evaluation.md) · [Plugins](docs/plugins.md) | How each part works |
+| [CLI](docs/cli.md) · [Serving](docs/serving.md) · [Training](docs/training.md) · [Evaluation](docs/evaluation.md) · [Plugins](docs/plugins.md) · [Console](docs/console.md) | How each part works |
 | [Deployment](docs/deployment.md) · [Verification log](docs/verification.md) | Where it runs, what has been tested |
-| [Plan](docs/plan.md) | Why Ookami exists, roadmap |
+| [Plan](docs/plan.md) · [Research](docs/research/2026-09-ai-infra-landscape.md) | Why Ookami exists, roadmap, landscape |
 
-Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under Apache-2.0.
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). The test suite needs no GPU (`uv sync --extra gateway && uv run pytest`). Report security issues privately: see [SECURITY.md](SECURITY.md).
+
+## License
+
+Apache-2.0. Ookami bundles only Apache-2.0, MIT and BSD components.
+
+<p align="center">Built by <a href="https://github.com/KatyarAILabs">Katyar AI Labs</a></p>

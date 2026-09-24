@@ -3,8 +3,9 @@
 ## Install
 
 ```bash
-git clone <repo> ookami && cd ookami
-uv sync --extra gateway          # or: pip install 'ookami[gateway]'
+pip install "ookami[gateway] @ git+https://github.com/KatyarAILabs/Ookami.git"
+# or, to work on Ookami itself:
+git clone https://github.com/KatyarAILabs/Ookami.git && cd Ookami && uv sync --extra gateway
 ```
 
 Install an inference engine for your hardware:
