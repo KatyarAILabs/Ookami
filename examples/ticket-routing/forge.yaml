@@ -1,0 +1,28 @@
+# Quickstart: fine-tune a small open model on one machine, gate it against the base, serve it.
+#   python make_data.py > tickets.jsonl
+#   forge train router -f forge.yaml      # snapshot -> LoRA -> gate vs base
+#   forge promote router -f forge.yaml    # only if it passed
+#   forge up -f forge.yaml                # serve the live version behind the gateway
+apiVersion: forge.dev/v1alpha1
+kind: Platform
+metadata: { name: quickstart }
+spec:
+  storage: { uri: ./.forge }
+---
+apiVersion: forge.dev/v1alpha1
+kind: Model
+metadata: { name: router }
+spec:
+  base: qwen3-4b-instruct-2507
+  data:
+    source: { jsonl: tickets.jsonl }
+    minExamples: 300
+  train:
+    recipe: sft
+    overrides: { epochs: 2 }
+  eval:
+    splits: { heldOut: 0.1, audit: 0.05 }
+    generation: { maxTokens: 16 }
+    evaluators:
+      - labels: { column: label }
+    gate: { test: superiority, confidence: 0.95, minItems: 20 }

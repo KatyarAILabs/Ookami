@@ -18,12 +18,24 @@ spec:
   base: gpt-oss-20b
 ```
 
-> **Status: 0.1, early.** What works today:
-> - `forge up` / `status` / `logs` / `down` on one machine: open models served by vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, behind a managed LiteLLM gateway;
-> - the config schema, `forge validate` and `forge schema`;
-> - `forge eval`, the promotion gate, with evaluator plugins.
+> **Status: 0.2, early.** What works today, on one machine:
+> - `forge up` / `status` / `logs` / `down`: open models served by vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, behind a managed LiteLLM gateway;
+> - `forge train`: versioned data snapshot, memory-planned LoRA fine-tune (MLX or TRL), one job at a time, checkpoints and resume, then an automatic gate against the live version;
+> - `forge models` / `promote`: a registry that refuses to put a version live unless it passed its gate;
+> - `forge eval` with your own evaluators or plugins.
 >
-> Training and gateway hand-off are next. See [docs/plan.md](docs/plan.md).
+> Gateway hand-off (shadow/canary/rollback), traffic capture and GRPO are next. See [docs/plan.md](docs/plan.md).
+
+## Quickstart: fine-tune, gate and serve on one machine
+
+```bash
+cd examples/ticket-routing && python make_data.py > tickets.jsonl
+forge train router        # snapshot -> LoRA -> gate vs the base model
+forge promote router      # refused unless the gate passed
+forge up                  # serves the live version behind the gateway on :4000
+```
+
+On an M3 Max, `forge train` took about 6 minutes (Qwen3-4B, 4-bit, 2 epochs). The gate scored the trained version at 82% on held-out rows and 93% on audit rows, against 0% for the base model; the queue codes are made up, so the base can't know them.
 
 ## Components
 
@@ -95,6 +107,8 @@ def score(example, output) -> Score:
 | `src/forge/config.py` | `forge.yaml` schema (Pydantic) and lints. It is also the source for JSON Schema and, later, the CRDs |
 | `src/forge/catalog.py` | Known base models: licence and weights per engine |
 | `src/forge/local/` | The local backend: engines (vllm, mlx, command), the managed gateway, process supervision |
+| `src/forge/train/` | Planner, trainer backends (mlx, trl, command), job queue and worker, post-train gate |
+| `src/forge/registry.py` | Versions, gate decisions, promotions, event log (SQLite) |
 | `src/forge/interfaces.py` | `JobRunner`, `ModelServer`, `Router`: the seams each backend implements |
 | `src/forge/evaluators/` | Evaluator SDK and built-ins |
 | `src/forge/data.py` | Datasets, frozen splits, getting outputs from targets |
