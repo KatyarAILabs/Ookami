@@ -163,7 +163,8 @@ def dataset_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
-def outputs_for(target: Target, examples: list[Example], timeout: float = 120.0) -> dict[str, Any]:
+def outputs_for(target: Target, examples: list[Example], timeout: float = 120.0, max_tokens: int = 1024,
+                temperature: float = 0.0) -> dict[str, Any]:
     """id -> output message. openai targets are called now; results targets are JSONL {id, output}."""
     if target.kind == "results":
         rows = [json.loads(line) for line in target.path.read_text().splitlines() if line.strip()]
@@ -171,7 +172,8 @@ def outputs_for(target: Target, examples: list[Example], timeout: float = 120.0)
     out = {}
     for ex in examples:
         msgs = ex.input if isinstance(ex.input, list) else [{"role": "user", "content": str(ex.input)}]
-        body: dict[str, Any] = {"model": target.model, "messages": msgs, "temperature": 0}
+        body: dict[str, Any] = {"model": target.model, "messages": msgs, "temperature": temperature,
+                                "max_tokens": max_tokens}
         if ex.meta.get("tools"):
             body["tools"] = ex.meta["tools"]
         resp = post_json(f"{target.base_url}/chat/completions", body, timeout=timeout)

@@ -24,7 +24,7 @@ class Plan:
     alpha: int = 32
     dropout: float = 0.05
     layers: int = 16                 # mlx: top layers to adapt (-1 = all); trl adapts all linear layers
-    learning_rate: float = 1e-4
+    learning_rate: float = 2e-4
     batch_size: int = 1
     grad_accumulation: int = 8
     epochs: float = 1.0

@@ -267,8 +267,14 @@ class Gate(Strict):
         return self
 
 
+class Generation(Strict):
+    maxTokens: int = Field(1024, ge=1)
+    temperature: float = Field(0.0, ge=0)
+
+
 class Eval(Strict):
     splits: Splits = Splits()
+    generation: Generation = Generation()
     evaluators: list[EvaluatorSpec] = Field(min_length=1)
     gate: Gate = Gate()
 
