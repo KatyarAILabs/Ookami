@@ -135,6 +135,12 @@ class Observability(Strict):
     langfuse: Langfuse | None = None
 
 
+class Console(Strict):
+    """The web console: models, training, keys, usage and a playground. Sign in with the master key."""
+    port: int = Field(4100, ge=1, le=65535, description="console port")
+    host: str = Field("127.0.0.1", description="bind address; keep it local unless it sits behind your own proxy")
+
+
 class Component(Strict):
     """Turn a component on or off."""
     enabled: bool = Field(True, description="run this component")
@@ -147,7 +153,7 @@ class Components(Strict):
     eval: Component = Field(Component(), description="held-out sets, the promotion gate, reports; on by default")
     registry: Component = Field(Component(), description="versions, gate decisions, promotions; on by default")
     tracing: Component = Field(Component(enabled=False), description="capture gateway traffic with Trajectory (set Platform.tracing); off by default")
-    console: Component = Field(Component(enabled=False), description="web UI (planned); off by default")
+    console: Component = Field(Component(enabled=False), description="web console, started by ookami up; off by default")
 
 
 class TrainingCompute(Strict):
@@ -181,6 +187,7 @@ class PlatformSpec(Strict):
     components: Components = Components()
     tracing: Tracing | None = None
     observability: Observability = Observability()
+    console: Console = Console()
     compute: Compute = Compute()
     telemetry: Literal["off", "on"] = Field("off", description="opt-in usage telemetry (none is sent today)")
 

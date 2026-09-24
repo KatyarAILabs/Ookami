@@ -329,7 +329,19 @@ def up(cfg: Config, timeout: float = 900.0, log=print) -> list[Service]:
             except UpError as e:
                 raise UpError(f"{e}\nIf LiteLLM is missing its proxy extras: pip install 'ookami[gateway]'") from None
             log(f"ready    gateway: {svc.url}")
-        elif gw.mode == "external":
+        if plat.components.console.enabled:
+            c = plat.console
+            if not port_free(c.port, c.host):
+                raise UpError(f"console port {c.port} is busy; set console.port")
+            argv = [sys.executable, "-m", "ookami.cli", "console", "-f", str(cfg.path), "--host", c.host,
+                    "--port", str(c.port)]
+            svc = Service("console", "console", start(argv, logs / "console.log"), c.port, f"http://{c.host}:{c.port}",
+                          f"http://{c.host}:{c.port}/healthz", str(logs / "console.log"), argv)
+            services.append(svc)
+            write_state(cfg, services)
+            wait_ready(svc, 30.0)
+            log(f"ready    console: {svc.url}")
+        if gw.mode == "external":
             snippet = storage_dir(cfg) / "run" / "gateway-models.yaml"
             snippet.write_text(yaml.safe_dump(gateway_config([s for s in services if s.kind == "engine"], tracing,
                                                              providers), sort_keys=False))

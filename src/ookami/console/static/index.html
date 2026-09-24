@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ookami Console</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="signin" class="signin hidden">
+    <form id="signin-form" class="signin-card">
+      <div class="brand brand-lg"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+      <p class="muted">Sign in with the master key. Get it with <code>ookami keys master</code>.</p>
+      <label for="signin-key">Master key</label>
+      <input id="signin-key" type="password" autocomplete="off" spellcheck="false" placeholder="ook-master-…" required>
+      <p id="signin-error" class="error hidden"></p>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+      <nav id="nav">
+        <a href="#/overview" data-page="overview">Overview</a>
+        <a href="#/models" data-page="models">Models</a>
+        <a href="#/training" data-page="training">Training</a>
+        <a href="#/keys" data-page="keys">Keys</a>
+        <a href="#/usage" data-page="usage">Usage</a>
+        <a href="#/playground" data-page="playground">Playground</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div id="platform-name" class="muted small"></div>
+        <button id="signout" class="btn btn-ghost btn-sm">Sign out</button>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <h1 id="page-title"></h1>
+        <div id="gateway-pill" class="pill"></div>
+      </header>
+      <section id="page" class="page"></section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head"><h2 id="modal-title"></h2><button id="modal-close" class="btn btn-ghost btn-sm" aria-label="Close">✕</button></div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>

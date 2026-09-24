@@ -59,6 +59,8 @@ def cmd_up(args: argparse.Namespace) -> int:
     gw = next((s for s in services if s.kind == "gateway"), None)
     print()
     for s in services:
+        if s.kind == "console":
+            print(f"{'console':24} {s.url}  (sign in with `ookami keys master`)")
         if s.kind == "tracing":
             print(f"{'tracing':24} Trajectory collector <- gateway callbacks ({s.url})")
         if s.kind == "engine":
@@ -323,6 +325,17 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_console(args: argparse.Namespace) -> int:
+    from .console.server import run
+
+    cfg = _load_ok(args.file)
+    if cfg is None:
+        return 1
+    c = cfg.platform.spec.console
+    run(cfg.path, args.host or c.host, args.port or c.port)
+    return 0
+
+
 def cmd_worker(args: argparse.Namespace) -> int:
     from .train.jobs import run_worker
     return run_worker(args.file)
@@ -413,6 +426,12 @@ def main(argv: list[str] | None = None) -> int:
     us.add_argument("--by", choices=["key", "team"], default="key")
     us.add_argument("--since", default="30d", help="e.g. 24h, 7d, 30d")
     us.set_defaults(fn=cmd_usage)
+
+    co = sub.add_parser("console", help="run the web console in the foreground (ookami up starts it when enabled)")
+    co.add_argument("-f", "--file", default="ookami.yaml")
+    co.add_argument("--host")
+    co.add_argument("--port", type=int)
+    co.set_defaults(fn=cmd_console)
 
     w = sub.add_parser("_worker", help=argparse.SUPPRESS)
     w.add_argument("-f", "--file", default="ookami.yaml")

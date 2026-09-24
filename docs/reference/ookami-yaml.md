@@ -17,6 +17,7 @@ A `ookami.yaml` holds YAML documents, each with `apiVersion: ookami.dev/v1alpha1
 | `components` | [Components](#components) | see below | Switch on what you need. Each component also works on its own. |
 | `tracing` | [Tracing](#tracing) (optional) | - | Traffic capture with Trajectory (github.com/KatyarAILabs/trajectory): the collector, its lake, and the gateway hook. |
 | `observability` | [Observability](#observability) | see below | Where the gateway sends traces for humans to browse. Trajectory (tracing) is for training data. |
+| `console` | [Console](#console) | see below | The web console: models, training, keys, usage and a playground. Sign in with the master key. |
 | `compute` | [Compute](#compute) | see below | What compute to use and where it comes from. |
 | `telemetry` | `off` \| `on` | `off` | opt-in usage telemetry (none is sent today) |
 
@@ -61,7 +62,7 @@ Switch on what you need. Each component also works on its own.
 | `eval` | [Component](#component) | see below | held-out sets, the promotion gate, reports; on by default |
 | `registry` | [Component](#component) | see below | versions, gate decisions, promotions; on by default |
 | `tracing` | [Component](#component) | see below | capture gateway traffic with Trajectory (set Platform.tracing); off by default |
-| `console` | [Component](#component) | see below | web UI (planned); off by default |
+| `console` | [Component](#component) | see below | web console, started by ookami up; off by default |
 
 ### Component
 
@@ -102,6 +103,15 @@ Send every gateway call to Langfuse (over OpenTelemetry) for a trace and eval UI
 | `host` | str | **required** | your Langfuse URL, e.g. http://langfuse.internal:3000 |
 | `publicKey` | str | **required** | secret reference to the Langfuse public key |
 | `secretKey` | str | **required** | secret reference to the Langfuse secret key |
+
+### Console
+
+The web console: models, training, keys, usage and a playground. Sign in with the master key.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `port` | int | `4100` | console port |
+| `host` | str | `127.0.0.1` | bind address; keep it local unless it sits behind your own proxy |
 
 ### Compute
 
