@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ookami Console</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <div id="signin" class="signin hidden">
     <form id="signin-form" class="signin-card">
-      <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+      <div class="brand"><img src="logo.png" alt=""><span>Ookami</span></div>
       <h1>Sign in to the console</h1>
       <p class="muted">Use the master key. Print it with <code>ookami keys master</code>.</p>
       <label for="signin-key">Master key</label>
@@ -23,7 +24,7 @@
   <div id="app" class="app hidden">
     <header class="header">
       <div class="header-row">
-        <div class="brand"><img src="favicon.svg" alt=""><span>Ookami</span></div>
+        <div class="brand"><img src="logo.png" alt=""><span>Ookami</span></div>
         <span class="slash">/</span>
         <span id="platform-name" class="project"></span>
         <div class="header-right">
