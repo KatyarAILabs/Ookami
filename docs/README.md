@@ -14,6 +14,7 @@ Parts are still planned: traffic capture, rollout (hand-off), Kubernetes, and GP
 | [Getting started](getting-started.md) | Install, serve a model, fine-tune one, put it live |
 | [Architecture](architecture.md) | Components, the four interfaces, the model lifecycle, what lands on disk |
 | [Configuration reference](reference/ookami-yaml.md) | Every `ookami.yaml` field (generated from the code) |
+| [Console](console.md) | The web UI: models, training, keys, usage, playground |
 | [CLI](cli.md) | Every command, its flags and exit codes |
 | [Serving](serving.md) | Engines (vLLM, MLX, any command), the managed gateway, serving trained versions |
 | [Training](training.md) | Snapshots, the memory planner, trainers, the job queue, checkpoints |

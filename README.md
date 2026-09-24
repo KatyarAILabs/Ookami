@@ -22,7 +22,8 @@ spec:
 > - `ookami init` → `ookami up`: open models on vLLM (NVIDIA), MLX (Apple silicon) or any OpenAI-compatible server, plus API models, behind one gateway with **auth on by default** (keys, budgets, rate limits);
 > - `ookami usage`: spend per key or team, API and self-hosted;
 > - `ookami train` → gate → `promote`: LoRA fine-tuning gated against the live version by your evaluators, including Inspect and lm-eval;
-> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory), and a Langfuse trace UI.
+> - tracing with [Trajectory](https://github.com/KatyarAILabs/trajectory), and a Langfuse trace UI;
+> - a web [console](docs/console.md) for models, training, keys, usage and a playground.
 >
 > Gateway hand-off (shadow/canary/rollback), Kubernetes and GPU efficiency are next. See [docs/plan.md](docs/plan.md).
 
@@ -36,6 +37,8 @@ ookami up                  # serves the live version behind the gateway on :4000
 ```
 
 On an M3 Max, `ookami train` took about 6 minutes (Qwen3-4B, 4-bit, 2 epochs). The gate scored the trained version at 82% on held-out rows and 93% on audit rows, against 0% for the base model; the queue codes are made up, so the base can't know them.
+
+![Ookami console](docs/images/console-overview.png)
 
 ## How it fits together
 
@@ -59,7 +62,7 @@ flowchart LR
 | eval | on | Ookami gate + your evaluators |
 | registry | on | Postgres + your bucket |
 | tracing | off | [Trajectory](https://github.com/KatyarAILabs/trajectory): gateway callbacks → redacted Parquet lake |
-| console | off | Ookami UI |
+| console | off | Ookami's web UI (standard library, no build step) |
 
 ## Try it
 

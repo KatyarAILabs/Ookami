@@ -38,7 +38,7 @@ flowchart TB
 | registry | done | Every version with its data hash, config hash, gate decision, report and status; event log |
 | tracing | done, via [Trajectory](https://github.com/KatyarAILabs/trajectory) | Ookami runs (or points at) a Trajectory collector and wires the gateway's LiteLLM `generic_api` callback to it. `data.source.traces` trains on the lake through `cc export -format chat` |
 | hand-off | planned (0.3) | Shadow, canary, live and rollback at the gateway |
-| console | planned (0.5) | Web UI |
+| console | done | Web UI over the registry, jobs, keys and usage, with a playground; standard library only (see [console](console.md)) |
 
 ## The four interfaces
 

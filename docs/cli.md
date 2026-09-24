@@ -23,6 +23,7 @@ Every command reads `ookami.yaml` from the current directory, or from `-f FILE`.
 | `ookami keys create NAME [--team T] [--budget USD] [--rpm N]` | Creates a gateway key; prints it once |
 | `ookami keys list` / `revoke NAME` / `master` | Lists keys with this month's spend, revokes one, or prints the master key |
 | `ookami usage [--by key\|team] [--since 30d]` | Spend per key or team: API cost plus self-hosted hardware cost split by tokens |
+| `ookami console [-f FILE] [--host H] [--port P]` | Runs the web console in the foreground (`ookami up` starts it when `components.console` is enabled) |
 | `ookami eval --candidate T --incumbent T [--model M] [-f FILE]` | Runs the Model's evaluators on two targets and applies the gate |
 
 **Eval targets:**
