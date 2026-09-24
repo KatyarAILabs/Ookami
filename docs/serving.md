@@ -1,5 +1,19 @@
 # Serving
 
+## What `forge up` starts
+
+```mermaid
+flowchart LR
+    client["your app / agents"] -->|"OpenAI API :4000"| gw["LiteLLM gateway<br/>managed"]
+    gw -->|"model = a"| e1["engine for Model a<br/>vLLM or MLX :8100"]
+    gw -->|"model = b"| e2["engine for Model b<br/>:8101"]
+    e1 --- v1[("live version of a<br/>adapter or fused model")]
+    gw -. "generic_api callback<br/>(tracing enabled)" .-> traj["Trajectory collector"]
+    traj --> lake[("lake")]
+```
+
+Start order: the collector first (if managed), then engines, then the gateway. If anything fails to start, everything already started is stopped.
+
 ## Engines
 
 Each Model runs as one OpenAI-compatible server process. `serve.engine` picks the engine:

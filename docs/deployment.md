@@ -2,6 +2,20 @@
 
 Only the `local` backend exists today. It runs on one machine: a laptop, a GPU VM, or a container. The Kubernetes backend (operator, CRDs, Helm chart, Kueue, GPU autoscaling) is milestone 0.4; see the [plan](plan.md).
 
+```mermaid
+flowchart LR
+    subgraph one["One machine (laptop or GPU VM)"]
+        f1["forge up / train"] --> p1["engine + gateway + worker<br/>processes"]
+    end
+    subgraph pod["Kubernetes pod (k8s-smoke, k8s-gpu)"]
+        f2["forge in a container<br/>wheel from a ConfigMap"] --> p2["same processes<br/>inside the pod"]
+    end
+    subgraph aws["AWS spot GPU (aws-gpu)"]
+        f3["aws.sh up · test · down"] --> p3["vllm/vllm-openai container<br/>on a g5.xlarge"]
+    end
+    k8s["planned: Kubernetes backend<br/>operator · CRDs · Kueue · autoscaling"]
+```
+
 ## One machine
 
 ```bash

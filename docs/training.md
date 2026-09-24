@@ -2,6 +2,18 @@
 
 `forge train MODEL` does four things, in this order.
 
+```mermaid
+flowchart LR
+    src[("data source<br/>jsonl · parquet · hf · traces")] --> split{"hash split<br/>per identical input"}
+    split -->|"train"| snap[("snapshot<br/>train.jsonl + valid.jsonl")]
+    split -->|"heldOut + audit"| keep[("reserved for the gate<br/>never trained on")]
+    snap --> plan["memory planner"] --> job["job in queue"]
+    job --> worker["worker<br/>one job at a time"] --> trainer["trainer<br/>mlx · trl · command"]
+    trainer --> adapter[("adapter + checkpoints")]
+    adapter --> gate["gate vs incumbent"]
+    keep --> gate
+```
+
 ## 1. Snapshot the data
 
 `data.source` is one of:

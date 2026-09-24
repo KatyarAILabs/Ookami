@@ -110,12 +110,13 @@ Full reference: `examples/forge.yaml`. JSON Schema: `forge schema`.
 
 ## Architecture
 
-```
-forge.yaml ─► controller (reconcile loop per Model; queue; registry; eval runner; audit log)
-                 ├─ JobRunner    local: processes/containers · k8s: Kueue + Job · skypilot: managed jobs
-                 ├─ ModelServer  vLLM multi-LoRA (+ KEDA on k8s)
-                 ├─ Router       LiteLLM plugin / Agent Router extension
-                 └─ Evaluator    your code, labels, commands, harnesses, webhooks
+```mermaid
+flowchart LR
+    cfg["forge.yaml"] --> ctl["controller<br/>per-Model reconcile · queue · registry · eval · audit log"]
+    ctl --> jr["JobRunner<br/>local processes · k8s Kueue + Job · SkyPilot"]
+    ctl --> ms["ModelServer<br/>vLLM multi-LoRA · MLX · command"]
+    ctl --> rt["Router<br/>LiteLLM plugin · Agent Router"]
+    ctl --> ev["Evaluator<br/>your code · labels · commands · plugins"]
 ```
 
 - **Controller:** Python with Kopf on Kubernetes. The same reconcile code runs in `local` mode without Kubernetes.

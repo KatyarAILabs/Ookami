@@ -2,22 +2,23 @@
 
 ## Overview
 
-```
-                    forge.yaml   (Platform + Model documents)
-                         │
-             ┌───────────▼────────────┐
-             │  forge CLI / controller │   validate · up/down · train · eval · promote
-             └──┬───────┬───────┬─────┘
-                │       │       │
-         JobRunner  ModelServer  Router        ← backend seams (src/forge/interfaces.py)
-                │       │       │
-   local:  worker +   engine     LiteLLM
-           trainer    process    (managed)
-           process
-                │
-            Evaluator  ← customer judgement (src/forge/evaluators/)
-                │
-            Registry   ← versions, gate decisions, events (src/forge/registry.py)
+```mermaid
+flowchart TB
+    cfg["forge.yaml<br/>Platform + Model documents"] --> cli["forge CLI / controller<br/>validate · up · train · eval · promote"]
+    cli --> jr["JobRunner"]
+    cli --> ms["ModelServer"]
+    cli --> rt["Router"]
+    cli --> reg[("Registry<br/>versions · gate decisions · events")]
+    jr --> worker["worker + trainer process<br/>mlx · trl · command"]
+    ms --> engine["engine process<br/>vLLM · MLX · command"]
+    rt --> gw["LiteLLM gateway<br/>managed"]
+    worker --> gate["gate"]
+    gate --> ev["Evaluators<br/>your judgement"]
+    gate --> reg
+    gw --> engine
+    gw -. "generic_api callback" .-> traj["Trajectory collector"]
+    traj --> lake[("lake<br/>Parquet")]
+    lake -. "cc export -format chat" .-> worker
 ```
 
 - **One config file.** `forge.yaml` holds two kinds of document:
@@ -52,16 +53,44 @@
 
 ## Model lifecycle
 
+```mermaid
+stateDiagram-v2
+    [*] --> training: forge train
+    training --> failed: trainer crashed or wrote no adapter
+    training --> evaluating: adapter packaged (mlx - fused)
+    evaluating --> passed: gate pass
+    evaluating --> rejected: gate partial or fail
+    evaluating --> failed: gate could not run
+    passed --> promoted: forge promote
+    rejected --> promoted: forge promote --force --reason
+    promoted --> retired: another version promoted
+    failed --> [*]
+    rejected --> [*]
+    retired --> [*]
 ```
-            forge train                         worker (one job at a time)
-data ──► snapshot ──► registry: vN training ──► trainer ──► package (mlx: fuse)
-                                                                 │
-                                   gate: serve vN and the incumbent side by side,
-                                   run evaluators on held-out + audit rows
-                                                                 │
-                                       pass ─► vN passed    fail ─► vN rejected
-                                                                 │
-forge promote ─► vN promoted (previous live version → retired) ─► forge up / engine restart serves vN
+
+```mermaid
+sequenceDiagram
+    actor U as You
+    participant CLI as forge train
+    participant Q as Job queue
+    participant W as Worker
+    participant T as Trainer
+    participant G as Gate
+    participant R as Registry
+    U->>CLI: forge train router
+    CLI->>CLI: snapshot data (held-out + audit excluded)
+    CLI->>CLI: plan LoRA for this machine
+    CLI->>R: create vN (training)
+    CLI->>Q: enqueue job, start worker if none
+    Q->>W: next job (one at a time)
+    W->>T: run trainer, checkpoints to storage
+    T-->>W: adapter
+    W->>G: serve vN and the incumbent side by side
+    G->>G: run evaluators, paired bootstrap per split and slice
+    G->>R: vN passed or rejected, report path
+    U->>CLI: forge promote router
+    CLI->>R: vN promoted, previous live retired
 ```
 
 - **Incumbent:** the version that is live now. If nothing is live, it's the untrained base model.

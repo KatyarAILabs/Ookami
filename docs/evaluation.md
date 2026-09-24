@@ -2,6 +2,22 @@
 
 **Forge supplies the statistics and the gate. You supply the judgement.** Forge never claims a model is correct. It reports whether the candidate met *your* evaluators, with confidence bounds.
 
+## How the gate decides
+
+```mermaid
+flowchart TB
+    rows[("held-out + audit rows")] --> cand["candidate<br/>new version"]
+    rows --> inc["incumbent<br/>live version or base"]
+    cand --> evs["your evaluators<br/>score each output"]
+    inc --> evs
+    evs --> pair["pair scores by item<br/>average trials"]
+    pair --> boot["bootstrap the differences<br/>per split and slice"]
+    boot --> test{"test<br/>non-inferiority · superiority · threshold"}
+    test -->|"every result passes"| pass["pass → version passed"]
+    test -->|"overall passes, a slice fails"| partial["partial → rejected"]
+    test -->|"otherwise"| fail["fail → rejected"]
+```
+
 ## Evaluators
 
 | Kind | YAML | Shape | Judges |

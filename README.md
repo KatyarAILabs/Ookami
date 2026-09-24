@@ -39,6 +39,18 @@ forge up                  # serves the live version behind the gateway on :4000
 
 On an M3 Max, `forge train` took about 6 minutes (Qwen3-4B, 4-bit, 2 epochs). The gate scored the trained version at 82% on held-out rows and 93% on audit rows, against 0% for the base model; the queue codes are made up, so the base can't know them.
 
+## How it fits together
+
+```mermaid
+flowchart LR
+    app["your apps"] -->|"OpenAI API"| gw["gateway"]
+    gw --> eng["engines<br/>your GPUs"]
+    gw -.-> traj["Trajectory<br/>capture"]
+    traj -.-> data[("data")]
+    data --> train["fine-tune"] --> gate{"gate<br/>your evals"}
+    gate -->|"pass + promote"| eng
+```
+
 ## Components
 
 | Component | Default | Built on |
