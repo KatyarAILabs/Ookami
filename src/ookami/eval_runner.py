@@ -125,10 +125,13 @@ def run_eval(cfg: Config, model: str, candidate: Target, incumbent: Target) -> R
                 notes.append(f"{spec_e.name} / {split}: {only} items scored for only one target were left out")
             slices: dict[str, list[str]] = {ALL: common}
             if ev_cfg.gate.perSlice:
+                by_slice: dict[str, list[str]] = {}
                 for item in common:
                     key = c_items[item][1]
                     if key:
-                        slices.setdefault(key, []).append(item)
+                        by_slice.setdefault(key, []).append(item)
+                if len(by_slice) > 1:          # one slice would just repeat the overall row
+                    slices.update(by_slice)
             for sl, items in slices.items():
                 pairs = [(c_items[k][0], i_items[k][0]) for k in items]
                 if spec_e.gate:

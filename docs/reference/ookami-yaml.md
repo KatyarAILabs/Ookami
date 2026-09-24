@@ -236,7 +236,7 @@ Generation settings when Ookami produces outputs for row evaluators.
 
 ### EvaluatorSpec
 
-One evaluator: labels, python, webhook, command, plugin, structural (lm-eval, inspect planned).
+One evaluator: labels, python, webhook, command, plugin, inspect, lm-eval, structural.
 
 | Field | Type | Default | Description |
 |---|---|---|---|

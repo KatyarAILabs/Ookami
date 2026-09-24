@@ -1,0 +1,22 @@
+# Gate with standard harnesses: an Inspect task and an lm-evaluation-harness task.
+#   needs uv (the harnesses run through uvx in their own environments)
+#   ookami eval -f examples/harness.yaml --candidate openai:http://localhost:4000/v1#local \
+#                                        --incumbent openai:http://localhost:8100/v1#default_model
+apiVersion: ookami.dev/v1alpha1
+kind: Platform
+metadata: { name: harness }
+spec:
+  storage: { uri: ./.ookami }
+---
+apiVersion: ookami.dev/v1alpha1
+kind: Model
+metadata: { name: local }
+spec:
+  base: qwen3-4b-instruct-2507
+  eval:
+    evaluators:
+      - inspect: { task: evals/arithmetic.py }
+        name: arithmetic
+      - lm-eval: { tasks: [gsm8k], limit: 20 }
+        name: gsm8k
+    gate: { test: non-inferiority, margin: -0.1, minItems: 10 }

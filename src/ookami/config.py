@@ -249,7 +249,7 @@ class Splits(Strict):
 
 
 class EvaluatorSpec(Strict):
-    """One evaluator: labels, python, webhook, command, plugin, structural (lm-eval, inspect planned)."""
+    """One evaluator: labels, python, webhook, command, plugin, inspect, lm-eval, structural."""
     kind: Literal[EVALUATOR_KINDS] = Field(description="written as the single key, e.g. `- labels: {column: x}`")  # type: ignore[valid-type]
     params: dict[str, Any] = Field({}, description="the value under the kind key")
     name: str = Field(description="defaults from the kind; must be unique per Model")

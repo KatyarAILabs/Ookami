@@ -8,6 +8,7 @@ from .base import (Example, Observation, RolloutEvaluator, RowEvaluator, Score, 
                    load_ref)
 from .builtin import LabelsEvaluator, PythonEvaluator, StructuralEvaluator, WebhookEvaluator
 from .command import CommandEvaluator
+from .harness import InspectEvaluator, LmEvalEvaluator
 
 __all__ = ["Example", "Observation", "RolloutEvaluator", "RowEvaluator", "Score", "Target", "as_score",
            "evaluator", "load_ref", "build"]
@@ -25,6 +26,10 @@ def build(spec: EvaluatorSpec, base_dir: Path) -> RowEvaluator | RolloutEvaluato
         return WebhookEvaluator(spec.name, **p)
     if spec.kind == "command":
         return CommandEvaluator(spec.name, base_dir=base_dir, **p)
+    if spec.kind == "inspect":
+        return InspectEvaluator(spec.name, base_dir=base_dir, **p)
+    if spec.kind == "lm-eval":
+        return LmEvalEvaluator(spec.name, base_dir=base_dir, **p)
     if spec.kind == "plugin":
         return load_plugin(spec.name, base_dir, **p)
     raise NotImplementedError(f"{spec.kind} evaluators are in the schema but not implemented yet")
