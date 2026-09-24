@@ -138,9 +138,17 @@ flowchart LR
 | **0.0.1 (done)** | `forge.yaml` schema, `validate`, `schema`, backend interfaces, Evaluator SDK, `forge eval` + gate + reports, 42 tests | `forge eval` gives the correct pass/fail on recorded results and on a live command |
 | **0.1: one GPU box (done, except registry)** | `forge up` / `status` / `logs` / `down`; engines vllm, mlx, command; managed LiteLLM gateway (`forge-ml[gateway]`); evaluator plugins via entry points. Verified on Apple silicon (MLX + LiteLLM); vLLM path not yet run on a GPU | `pip install forge-ml && forge up -f examples/serve-only.yaml` serves gpt-oss-20b behind the gateway on a fresh machine |
 | **0.2: train + gate (done)** | JSONL/Parquet/HF ingest and versioned snapshots; memory planner; `train_sft` on mlx, trl or a command; one-job queue with checkpoint/resume; automatic gate vs the live version; registry with gated `promote`; `forge up` serves the live version | Verified on Apple silicon: a 4B model trained, was rejected when broken, passed when fixed (82% vs 0% held out), and served through the gateway. The TRL path is not yet run on a GPU. Promotion restarts the engine; runtime adapter hot-load moves to 0.3 |
-| **0.3: hand-off** | LiteLLM router plugin (shadow/canary/live/rollback), `train_rl` (GRPO). Tracing already done through Trajectory | A route moves from an API model to the fine-tuned model and rolls back automatically on a metric drop |
-| **0.4: Kubernetes** | Operator + CRDs, OCI Helm chart, Kueue, GPU profiles, KEDA, external Postgres/S3, `doctor`, `upgrade` | Clean EKS and GKE installs in < 30 min; training runs on a spot node that exists only for the job |
-| **0.5: enterprise delivery** | Zarf/ModelPack air-gap bundle, cosign/SBOM gate, SkyPilot backend, console, lm-eval/Inspect evaluators | Air-gapped install on a disconnected k3s VM |
+| **0.3: secure by default, first 5 minutes** | Gateway auth on by default (generated master key, per-team virtual keys, budgets, rate limits); cost attribution across API providers and self-hosted GPU time; closed-API providers routed next to self-hosted models; `forge init` + one-command install (`uvx forge up`); Inspect and lm-eval evaluators; Trajectory → Langfuse wiring for a trace UI; the NVIDIA path verified on a GPU | A fresh machine reaches its first authenticated OpenAI-compatible call in about 5 minutes; per-key spend is visible for both API and self-hosted calls |
+| **0.4: hand-off** | LiteLLM router plugin: shadow, canary, live, automatic rollback, gated by the same evaluators; runtime LoRA loading on vLLM without restart; `train_rl` (GRPO via verl, agent RL over the Trajectory lake via SkyRL or ART) | A route moves from an API model to the fine-tuned model and rolls back automatically on a metric drop |
+| **0.5: Kubernetes** | Operator + CRDs from the same schema, OCI Helm chart, llm-d serving, Kueue + KEDA + GPU Operator + DRA, Karpenter on cloud, external Postgres/S3, `doctor`, `upgrade`; **SSO (OIDC), RBAC, teams and quotas in the free edition** | Clean EKS, GKE and on-prem installs in < 30 min; one config file moves from the laptop to the cluster unchanged |
+| **0.6: GPU efficiency** | Scale-to-zero with gateway fallback; fractional GPUs (HAMi or KAI); multi-LoRA density; KV/prefix-aware routing through llm-d; published, reproducible benchmarks for gateway overhead, throughput and cold start | Measurably higher GPU utilisation than a plain vLLM deployment on the same traffic |
+| **0.7: agents and regulated sites** | MCP gateway (ContextForge), sandboxes (k8s agent-sandbox + gVisor), guardrails (Presidio + NeMo Guardrails); Zarf + ModelPack air-gap bundle, cosign/SBOM gate; SkyPilot backend; console | Air-gapped install on a disconnected k3s VM; an agent's tool calls run sandboxed and are captured by Trajectory |
+
+The order follows the [research](research/2026-09-ai-infra-landscape.md):
+- **Table stakes first:** auth, cost and the first five minutes.
+- **Then the part only Forge has:** the loop with gateway hand-off.
+- **Then scale:** Kubernetes and GPU efficiency.
+- **Then agents and regulated sites.**
 
 ## Open decisions
 

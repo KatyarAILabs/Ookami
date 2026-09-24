@@ -22,3 +22,4 @@ Parts are still planned: traffic capture, rollout (hand-off), Kubernetes, and GP
 | [Deployment](deployment.md) | One machine, a Kubernetes pod, an AWS spot GPU |
 | [Verification log](verification.md) | What has been tested where, the results, and known issues |
 | [Roadmap and design plan](plan.md) | Why Forge exists, milestones, open decisions |
+| [Research: the best packaged AI infra layer (Sep 2026)](research/2026-09-ai-infra-landscape.md) | Who packages AI infra, what teams need, best component per layer, where Forge stands |
