@@ -296,6 +296,33 @@ def _duration(text: str) -> float:
     return float(text[:-1]) * unit
 
 
+def cmd_init(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
+    from .init import detect, write
+
+    m = detect()
+    path = Path(args.file)
+    try:
+        write(path, m, api_model=args.with_openai, force=args.force)
+    except FileExistsError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"wrote {path} for {m.kind} (engine: {m.engine})")
+    steps = [] if m.engine_ready else [f"install the engine: {m.hint}"]
+    steps += ["pip install 'ookami[gateway]'   # if you haven't", f"ookami up -f {path}",
+              f"export OOKAMI_API_KEY=$(ookami keys master -f {path})",
+              "curl localhost:4000/v1/chat/completions -H \"Authorization: Bearer $OOKAMI_API_KEY\" "
+              "-H 'Content-Type: application/json' -d '{\"model\": \"local\", \"messages\": "
+              "[{\"role\": \"user\", \"content\": \"hi\"}]}'"]
+    if args.with_openai:
+        steps.insert(0, "export OPENAI_API_KEY=...   # for the gpt model")
+    print("next:")
+    for i, st in enumerate(steps, 1):
+        print(f"  {i}. {st}")
+    return 0
+
+
 def cmd_worker(args: argparse.Namespace) -> int:
     from .train.jobs import run_worker
     return run_worker(args.file)
@@ -310,6 +337,12 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="ookami", description="Packaged, self-hosted AI infrastructure.")
     p.add_argument("--version", action="version", version=f"ookami {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    i = sub.add_parser("init", help="write a working ookami.yaml for this machine")
+    i.add_argument("-f", "--file", default="ookami.yaml")
+    i.add_argument("--with-openai", action="store_true", help="also route an OpenAI model through the gateway")
+    i.add_argument("--force", action="store_true", help="overwrite an existing file")
+    i.set_defaults(fn=cmd_init)
 
     v = sub.add_parser("validate", help="check ookami.yaml")
     v.add_argument("-f", "--file", default="ookami.yaml")
