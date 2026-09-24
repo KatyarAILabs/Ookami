@@ -10,6 +10,9 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.optional-dependencies]
+gateway = ["litellm[proxy]>=1.80"]
+
 [project.scripts]
 forge = "forge.cli:main"
 
