@@ -1,0 +1,143 @@
+# Trajectory collector config for examples/traces (adapted from Trajectory's examples/local.yaml).
+# The redaction policy below is an example: it is yours to decide. Validate with:
+#   CC_HMAC_KEY=dev-key cc validate -config collector.yaml
+#
+# Set the mapping path to your Trajectory checkout (or the path inside its container image).
+schema_version: "0.2.0"
+tenant: dev
+
+sources:
+  # LiteLLM's generic_api callback posts here; Forge's managed gateway is wired to it.
+  - name: litellm
+    type: webhook
+    http: {listen: "127.0.0.1:4320"}
+    mapping: /path/to/trajectory/mappings/litellm.yaml
+
+assembly:
+  session_key: ["session.id", "gen_ai.conversation.id", "trace_id"]
+  window: 5m
+  # How long to hold an episode open after its terminal marker, so spans still
+  # in flight are absorbed rather than splitting into a second episode.
+  settle_after_terminal: 5s
+  max_in_flight: 10000
+  # How many recently closed sessions to remember, so a late span becomes a
+  # patch on the right episode rather than a new episode built from a fragment.
+  patch_memory: 10000
+
+redaction:
+  # Deny-by-default: only the paths listed below survive. Everything else is
+  # dropped before anything is written.
+  default: deny
+  on_error: quarantine
+  allow:
+    - "steps[*].content_inline"
+    - "steps[*].raw"
+  # An explicit deny wins over an allow, so a broad prefix can be carved out
+  # without rewriting it.
+  deny:
+    - "steps[*].raw.internal_secret"
+  rules:
+    # A regex rule matches anywhere in a field.
+    - id: email
+      match:
+        regex: "[\\w.+-]+@[\\w-]+\\.[\\w.]+"
+      action: tokenize
+    - id: card
+      match:
+        regex: "\\b(?:\\d[ -]*?){13,16}\\b"
+      action: drop
+    # A path rule targets one JSON node, which is more precise than a regex
+    # that might also hit something innocuous elsewhere.
+    - id: ssn_field
+      match:
+        path: "$.args.ssn"
+      action: drop
+  tokenization:
+    # The key comes from the environment, never from this file. Rotating it
+    # breaks joinability of new records against old ones, so a key_id is
+    # recorded to make a rotation detectable rather than silent.
+    key_env: CC_HMAC_KEY
+
+  # Set to discard every payload, keeping only structure and metadata. No
+  # other setting re-admits a payload when this is on.
+  # metadata_only: true
+
+  # An external entity detector for what no regex catches — names, addresses.
+  # It receives payload text, so run it inside the same perimeter (a sidecar).
+  # If it is unreachable, the episode is quarantined, not passed through.
+  # detector:
+  #   endpoint: http://127.0.0.1:5002/analyze   # Presidio analyzer
+  #   entities: [PERSON, LOCATION]
+  #   min_score: 0.6
+  #   action: tokenize
+
+entities:
+  - tool: zendesk.update_ticket
+    keys:
+      ticket_id: "$.args.id"
+  - tool: stripe.create_refund
+    keys:
+      order_id: "$.result.metadata.order_id"
+
+sampling:
+  # Head sampling keys on the session, not the span, so an episode is never
+  # half-captured.
+  head:
+    rate: 1.0
+  tail:
+    # CEL, evaluated after assembly and after redaction. Any one matching keeps
+    # the episode.
+    keep_if:
+      - "status != 'complete'"
+      - "has_error"
+      - "raw['human_edited'] == 'true'"
+      # Episodes with no business key can never be joined to an outcome, so
+      # they are worth keeping and looking at.
+      - "entity_key_count == 0"
+    otherwise_rate: 1.0
+
+buffer:
+  # The buffer is what makes acknowledged data survive a sink outage or a
+  # restart. Sizing it is sizing how long an outage you can absorb: roughly
+  # (your bytes/sec) x (tolerable outage).
+  #
+  # It holds only redacted records, so even a seized disk contains no
+  # unredacted payloads.
+  dir: ./.forge/trajectory/buffer
+  max_bytes: 1Gi
+  max_age: 24h
+  backpressure_at: 0.8
+  # Retries are for transient failures. A record the sink will never accept
+  # is dead-lettered immediately rather than consuming the retry budget.
+  max_attempts: 8
+  retry_base_delay: 500ms
+  retry_max_delay: 60s
+  # Encrypt buffered records at rest (AES-256-GCM). Changing or removing the
+  # key while undelivered records remain is refused, because they would
+  # become unreadable and be discarded — drain first.
+  # encryption: {key_env: CC_BUFFER_KEY}
+
+sinks:
+  - name: local
+    type: fs
+    dir: ./lake
+    # Files trend toward a compaction-friendly size rather than one small
+    # object per flush.
+    target_file_bytes: 256Mi
+    roll_interval: 15m
+    compression: zstd
+    partition_by: ["dt", "tenant", "task_type"]
+    blob_threshold_bytes: 8192
+
+telemetry:
+  metrics:
+    listen: "127.0.0.1:9464"
+  # The collector's own spans. Off unless an endpoint is set, so there is no
+  # outbound connection you did not configure. Spans carry ids and counts,
+  # never payloads.
+  # traces: {endpoint: "127.0.0.1:4317", insecure: true, sample_rate: 0.01}
+  log_level: info
+
+# Policy — redaction, entities, sampling, rate limits — reloads on SIGHUP
+# without dropping in-flight data. An invalid file is refused and the running
+# policy stays. Listeners, buffer, sink and assembly changes need a restart.
