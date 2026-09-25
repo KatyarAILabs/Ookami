@@ -9,6 +9,7 @@ from __future__ import annotations
 import platform
 import shlex
 import shutil
+import sys
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -102,8 +103,14 @@ def launch(doc: ModelDoc, port: int, adapter: str | None = None,
     return EngineLaunch(engine, str(fused) if fused else weights, "default_model", [*argv, *s.args])
 
 
+def find_bin(exe: str) -> str | None:
+    """Prefer executables installed next to Ookami (e.g. `uv tool install --with mlx-lm`), then PATH."""
+    beside = Path(sys.executable).parent / exe
+    return str(beside) if beside.exists() else shutil.which(exe)
+
+
 def _bin(exe: str, engine: str) -> str:
-    path = shutil.which(exe)
+    path = find_bin(exe)
     if not path:
         raise EngineError(f"{exe} not found on PATH: {INSTALL_HINT[engine]}")
     return path

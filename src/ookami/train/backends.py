@@ -15,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+from ..local.engines import find_bin
 from .planner import Plan
 
 
@@ -42,7 +43,7 @@ def argv_for(engine: str, job_dir: Path, command: str | None = None) -> list[str
     job = json.loads((job_dir / "job.json").read_text())
     p = Plan(**job["plan"])
     if engine == "mlx":
-        exe = shutil.which("mlx_lm.lora")
+        exe = find_bin("mlx_lm.lora")
         if not exe:
             raise TrainerError("mlx_lm.lora not found on PATH: pip install mlx-lm")
         adapter_dir = Path(job["adapter_dir"])
@@ -81,7 +82,7 @@ def post_train(engine: str, job: dict, log_path: Path) -> None:
     if engine != "mlx":
         return
     import subprocess
-    exe = shutil.which("mlx_lm.fuse")
+    exe = find_bin("mlx_lm.fuse")
     if not exe:
         raise TrainerError("mlx_lm.fuse not found on PATH: pip install mlx-lm")
     adapter = Path(job["adapter_dir"])

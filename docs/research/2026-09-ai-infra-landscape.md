@@ -66,6 +66,7 @@
 | SkyPilot / dstack | Compute across clouds; serving; SSO (SkyPilot) | CLI + server | Apache / MPL | Compute layer only |
 | GPUStack | Serving across 9 accelerator vendors, API keys, metering, UI | pip/Docker | Apache-2.0 | No training, evals or traces |
 | Ollama / LocalAI | Single-node serving | Binary/Docker | MIT | No multi-tenancy |
+| Unsloth (76.7k stars) | Desktop app and web UI to run and train models; fast single-GPU LoRA/RL; OpenAI-compatible API; `unsloth start` for coding agents | Desktop installers, `install.sh`, Docker | Core Apache-2.0; **Studio AGPL-3.0** | Personal, single-user: no gateway auth or budgets, no eval-gated promotion or registry. Complementary: its core could be an Ookami trainer |
 | Anyscale / Ray | Serving, training, RL | SaaS/BYOC | Ray Apache; Anyscale paid | A framework, not a product |
 | Databricks, W&B+CoreWeave, Nebius, Modal, Together/Fireworks | Up to the full loop | Managed | Proprietary | Not self-hostable or vendor-neutral |
 | Future AGI / Langfuse | Gateway, evals, observability, guardrails | Docker/Helm | Apache / MIT | No serving, training or GPUs |

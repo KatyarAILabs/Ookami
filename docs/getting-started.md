@@ -3,6 +3,8 @@
 ## Install
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/KatyarAILabs/Ookami/main/install.sh | sh   # uv + Ookami + your engine
+# or with pip:
 pip install "ookami[gateway] @ git+https://github.com/KatyarAILabs/Ookami.git"
 # or, to work on Ookami itself:
 git clone https://github.com/KatyarAILabs/Ookami.git && cd Ookami && uv sync --extra gateway

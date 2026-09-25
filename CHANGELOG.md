@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **One-line installer** (`install.sh`): installs uv, Ookami and the engine for the machine (MLX or vLLM).
+- **Bundled engines:** Ookami finds engine and trainer executables installed next to it, so `uv tool install --with mlx-lm` works without touching PATH.
+
 ## 0.3.0 (2026-09-25)
 
 - **Renamed to Ookami:**

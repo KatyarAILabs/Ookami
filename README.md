@@ -37,10 +37,23 @@ Ookami ships those pieces as **one install, driven by one `ookami.yaml`**, on ha
 
 ## Quickstart
 
-```bash
-pip install "ookami[gateway] @ git+https://github.com/KatyarAILabs/Ookami.git"
-pip install mlx-lm        # Apple silicon;  on NVIDIA: pip install vllm
+**macOS, Linux, WSL:**
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/KatyarAILabs/Ookami/main/install.sh | sh
+```
+
+The installer sets up [uv](https://docs.astral.sh/uv/) if you don't have it, then Ookami with the engine for your machine:
+
+| Machine | Engine it installs |
+|---|---|
+| Apple silicon | MLX |
+| Linux + NVIDIA GPU | vLLM |
+| CPU only | none: install llama.cpp yourself (`brew install llama.cpp`) |
+
+Then:
+
+```bash
 ookami init               # writes ookami.yaml for this machine
 ookami up                 # model + gateway (+ console, if enabled)
 export OOKAMI_API_KEY=$(ookami keys master)
@@ -49,6 +62,14 @@ curl localhost:4000/v1/chat/completions -H "Authorization: Bearer $OOKAMI_API_KE
 ```
 
 On an M3 Max, with the model already downloaded, `init` to the first authenticated reply took **10 seconds**.
+
+<details><summary>Install with pip instead</summary>
+
+```bash
+pip install "ookami[gateway] @ git+https://github.com/KatyarAILabs/Ookami.git"
+pip install mlx-lm        # Apple silicon;  on NVIDIA: pip install vllm
+```
+</details>
 
 ## Fine-tune, gate and serve in one sitting
 
